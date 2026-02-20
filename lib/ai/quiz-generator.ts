@@ -1,4 +1,5 @@
 import { openai, MODEL } from "./openai";
+import { parseAIJson } from "./parse-json";
 
 export interface QuizQuestion {
   question: string;
@@ -17,13 +18,11 @@ export async function generateQuiz(
 ): Promise<Quiz> {
   const response = await openai.chat.completions.create({
     model: MODEL,
-    max_tokens: 2000,
-    response_format: { type: "json_object" },
     messages: [
       {
         role: "system",
         content:
-          "You create educational quiz questions at different cognitive levels: recall, comprehension, and application. Output valid JSON only.",
+          "You create educational quiz questions at different cognitive levels: recall, comprehension, and application. Respond with ONLY valid JSON, no markdown fences, no extra text.",
       },
       {
         role: "user",
@@ -48,5 +47,5 @@ Create 5-10 questions. Mix difficulty levels. Keep language clear and accessible
     ],
   });
 
-  return JSON.parse(response.choices[0].message.content!) as Quiz;
+  return parseAIJson<Quiz>(response.choices[0].message.content!);
 }

@@ -35,6 +35,11 @@ export function UploadForm({ onSubmit, loading }: UploadFormProps) {
       setError("Only PDF and DOCX files are supported");
       return;
     }
+    const tooLarge = valid.find((f) => f.size > 25 * 1024 * 1024);
+    if (tooLarge) {
+      setError(`"${tooLarge.name}" exceeds 25MB limit`);
+      return;
+    }
     setError(null);
     setFiles((prev) => [...prev, ...valid]);
   }, []);

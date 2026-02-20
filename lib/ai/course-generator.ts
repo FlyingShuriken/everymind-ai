@@ -1,4 +1,6 @@
 import { openai, MODEL } from "./openai";
+import { parseAIJson } from "./parse-json";
+import type { ChatCompletionContentPart } from "openai/resources/chat/completions";
 
 interface SectionOutline {
   title: string;
@@ -19,27 +21,12 @@ interface SectionContent {
   keyTerms: { term: string; definition: string }[];
 }
 
-export async function generateOutline(
-  input: string,
-  isUpload: boolean,
-): Promise<CourseOutline> {
-  const response = await openai.chat.completions.create({
-    model: MODEL,
-    max_tokens: 2000,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are an educational content designer following Universal Design for Learning (UDL) principles. Output valid JSON only.",
-      },
-      {
-        role: "user",
-        content: `Create a course outline from the following ${isUpload ? "learning material" : "topic"}.
+export interface CourseInput {
+  text?: string;
+  images?: string[]; // base64 data URLs
+}
 
-${isUpload ? "Material:" : "Topic:"} ${input.slice(0, 12000)}
-
-Return JSON with this exact structure:
+const OUTLINE_PROMPT = `Return JSON with this exact structure:
 {
   "title": "Course title",
   "description": "1-2 sentence course description",
@@ -52,12 +39,45 @@ Return JSON with this exact structure:
   ]
 }
 
-Create 4-8 sections. Make content accessible and clear.`,
+Create 4-8 sections. Make content accessible and clear.`;
+
+export async function generateOutline(
+  input: CourseInput,
+): Promise<CourseOutline> {
+  const userContent: ChatCompletionContentPart[] = [];
+
+  if (input.images?.length) {
+    userContent.push({
+      type: "text",
+      text: "Create a course outline from the following learning material pages:",
+    });
+    for (const dataUrl of input.images) {
+      userContent.push({
+        type: "image_url",
+        image_url: { url: dataUrl, detail: "auto" },
+      });
+    }
+    userContent.push({ type: "text", text: OUTLINE_PROMPT });
+  } else {
+    userContent.push({
+      type: "text",
+      text: `Create a course outline from the following topic.\n\nTopic: ${input.text?.slice(0, 12000)}\n\n${OUTLINE_PROMPT}`,
+    });
+  }
+
+  const response = await openai.chat.completions.create({
+    model: MODEL,
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are an educational content designer following Universal Design for Learning (UDL) principles. Respond with ONLY valid JSON, no markdown fences, no extra text.",
       },
+      { role: "user", content: userContent },
     ],
   });
 
-  return JSON.parse(response.choices[0].message.content!) as CourseOutline;
+  return parseAIJson<CourseOutline>(response.choices[0].message.content!);
 }
 
 export async function generateSection(
@@ -66,13 +86,11 @@ export async function generateSection(
 ): Promise<SectionContent> {
   const response = await openai.chat.completions.create({
     model: MODEL,
-    max_tokens: 3000,
-    response_format: { type: "json_object" },
     messages: [
       {
         role: "system",
         content:
-          "You are an educational content writer. Write clear, accessible content: short paragraphs, simple sentences, define all terms. Target an 8th-grade reading level. Output valid JSON only.",
+          "You are an educational content writer. Write clear, accessible content: short paragraphs, simple sentences, define all terms. Target an 8th-grade reading level. Respond with ONLY valid JSON, no markdown fences, no extra text.",
       },
       {
         role: "user",
@@ -93,14 +111,13 @@ Return JSON with this exact structure:
     ],
   });
 
-  return JSON.parse(response.choices[0].message.content!) as SectionContent;
+  return parseAIJson<SectionContent>(response.choices[0].message.content!);
 }
 
 export async function generateCourse(
-  input: string,
-  isUpload: boolean,
+  input: CourseInput,
 ): Promise<{ outline: CourseOutline; sections: SectionContent[] }> {
-  const outline = await generateOutline(input, isUpload);
+  const outline = await generateOutline(input);
 
   const sections: SectionContent[] = [];
   for (const section of outline.sections) {

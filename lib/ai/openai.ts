@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { env } from "@/lib/env";
 
 const globalForOpenAI = globalThis as unknown as {
   openai: OpenAI | undefined;
@@ -7,10 +8,10 @@ const globalForOpenAI = globalThis as unknown as {
 export const openai =
   globalForOpenAI.openai ??
   new OpenAI({
-    apiKey: process.env.OPENROUTER_API_KEY,
+    apiKey: env.OPENROUTER_API_KEY,
     baseURL: "https://openrouter.ai/api/v1",
   });
 
-if (process.env.NODE_ENV !== "production") globalForOpenAI.openai = openai;
+if (env.NODE_ENV !== "production") globalForOpenAI.openai = openai;
 
-export const MODEL = process.env.AI_MODEL ?? "openai/gpt-4o";
+export const MODEL = env.AI_MODEL;

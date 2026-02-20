@@ -1,8 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { generateCourse } from "@/lib/ai/course-generator";
-import { extractText } from "@/lib/documents/extract";
+import { generateCourse, type CourseInput } from "@/lib/ai/course-generator";
+import { extractContent } from "@/lib/documents/extract";
+import { storageGet } from "@/lib/storage";
 
 export async function POST(
   _request: Request,
@@ -35,41 +36,42 @@ export async function POST(
     );
   }
 
-  // Set to PROCESSING
   await prisma.course.update({
     where: { id: courseId },
     data: { status: "PROCESSING" },
   });
 
   try {
-    // Extract text from source materials
     const sources = JSON.parse(
       course.sourceMaterials as string,
     ) as Array<{ type: string; url?: string; text?: string }>;
 
-    let inputText = "";
+    const input: CourseInput = {};
 
     for (const source of sources) {
       if (source.type === "topic") {
-        inputText += source.text ?? "";
+        input.text = (input.text ?? "") + (source.text ?? "");
       } else if (source.type === "file" && source.url) {
-        const response = await fetch(source.url);
-        const buffer = Buffer.from(await response.arrayBuffer());
-        const contentType =
-          response.headers.get("content-type") ?? "application/pdf";
-        const extracted = await extractText(buffer, contentType);
-        inputText += extracted + "\n\n";
+        const buffer = await storageGet(source.url);
+        const mimeType = source.url.endsWith(".docx")
+          ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          : "application/pdf";
+        const extracted = await extractContent(buffer, mimeType);
+
+        if (extracted.type === "images" && extracted.images) {
+          input.images = [...(input.images ?? []), ...extracted.images];
+        } else if (extracted.text) {
+          input.text = (input.text ?? "") + extracted.text + "\n\n";
+        }
       }
     }
 
-    if (!inputText.trim()) {
-      throw new Error("No text could be extracted from source materials");
+    if (!input.text?.trim() && !input.images?.length) {
+      throw new Error("No content could be extracted from source materials");
     }
 
-    const isUpload = sources[0]?.type === "file";
-    const { outline, sections } = await generateCourse(inputText, isUpload);
+    const { outline, sections } = await generateCourse(input);
 
-    // Update course title/description from outline
     await prisma.course.update({
       where: { id: courseId },
       data: {
@@ -78,7 +80,6 @@ export async function POST(
       },
     });
 
-    // Create CourseContent rows for each section
     for (let i = 0; i < sections.length; i++) {
       await prisma.courseContent.create({
         data: {
@@ -93,7 +94,6 @@ export async function POST(
       });
     }
 
-    // Set to READY
     await prisma.course.update({
       where: { id: courseId },
       data: { status: "READY" },

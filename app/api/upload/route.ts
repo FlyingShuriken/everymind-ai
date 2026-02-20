@@ -1,8 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
-import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
+import { storagePut } from "@/lib/storage";
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 const ALLOWED_TYPES = [
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -30,15 +30,14 @@ export async function POST(request: Request) {
 
   if (file.size > MAX_FILE_SIZE) {
     return NextResponse.json(
-      { error: "File must be under 10MB" },
+      { error: "File must be under 25MB" },
       { status: 400 },
     );
   }
 
-  const blob = await put(`uploads/${userId}/${file.name}`, file, {
-    access: "public",
+  const result = await storagePut(`${userId}/${file.name}`, file, {
     contentType: file.type,
   });
 
-  return NextResponse.json({ url: blob.url, filename: file.name });
+  return NextResponse.json({ url: result.url, filename: file.name });
 }

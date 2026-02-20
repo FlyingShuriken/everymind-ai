@@ -1,8 +1,9 @@
 import OpenAI from "openai";
-import { put } from "@vercel/blob";
+import { storagePut } from "@/lib/storage";
+import { env } from "@/lib/env";
 
 // TTS requires direct OpenAI API (not OpenRouter)
-const ttsClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const ttsClient = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 
 export async function generateSpeech(
   text: string,
@@ -16,10 +17,9 @@ export async function generateSpeech(
 
   const buffer = Buffer.from(await mp3.arrayBuffer());
 
-  const blob = await put(`tts/${contentId}.mp3`, buffer, {
-    access: "public",
+  const result = await storagePut(`tts/${contentId}.mp3`, buffer, {
     contentType: "audio/mpeg",
   });
 
-  return blob.url;
+  return result.url;
 }
