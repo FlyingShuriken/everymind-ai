@@ -1,19 +1,28 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { UploadForm } from "@/components/courses/upload-form";
 
 export default function NewCoursePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isTeacher, setIsTeacher] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/learning-profile")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.role === "TEACHER") setIsTeacher(true); })
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (data: {
     title: string;
     sourceType: "upload" | "topic";
     topic?: string;
     fileUrls?: string[];
+    studentProfileId?: string;
   }) => {
     setLoading(true);
     setError(null);
@@ -63,7 +72,7 @@ export default function NewCoursePage() {
         </p>
       )}
 
-      <UploadForm onSubmit={handleSubmit} loading={loading} />
+      <UploadForm onSubmit={handleSubmit} loading={loading} isTeacher={isTeacher} />
     </div>
   );
 }

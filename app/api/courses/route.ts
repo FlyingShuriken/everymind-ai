@@ -42,12 +42,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const { title, sourceType, topic, fileUrls } = parsed.data;
+  const { title, sourceType, topic, fileUrls, studentProfileId } = parsed.data;
+
+  // Validate profile belongs to user if provided
+  if (studentProfileId) {
+    const profile = await prisma.studentProfile.findFirst({
+      where: { id: studentProfileId, userId: user.id },
+    });
+    if (!profile) {
+      return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+    }
+  }
 
   const course = await prisma.course.create({
     data: {
       title,
       creatorId: user.id,
+      studentProfileId: studentProfileId ?? null,
       sourceMaterials: JSON.stringify(
         sourceType === "upload"
           ? (fileUrls ?? []).map((url) => ({ type: "file", url }))

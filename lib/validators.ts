@@ -33,6 +33,7 @@ export const createCourseSchema = z.object({
   sourceType: z.enum(["upload", "topic"]),
   topic: z.string().max(2000).optional(),
   fileUrls: z.array(z.string().min(1)).optional(),
+  studentProfileId: z.string().uuid().optional(),
 });
 
 export type CreateCourseInput = z.infer<typeof createCourseSchema>;

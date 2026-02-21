@@ -1,7 +1,17 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
+
+interface StudentProfile {
+  id: string;
+  name: string;
+  description?: string;
+  disabilities: string[];
+  preferences: string[];
+  isDefault: boolean;
+}
 
 interface UploadFormProps {
   onSubmit: (data: {
@@ -9,11 +19,13 @@ interface UploadFormProps {
     sourceType: "upload" | "topic";
     topic?: string;
     fileUrls?: string[];
+    studentProfileId?: string;
   }) => void;
   loading?: boolean;
+  isTeacher?: boolean;
 }
 
-export function UploadForm({ onSubmit, loading }: UploadFormProps) {
+export function UploadForm({ onSubmit, loading, isTeacher }: UploadFormProps) {
   const [sourceType, setSourceType] = useState<"upload" | "topic">("topic");
   const [title, setTitle] = useState("");
   const [topic, setTopic] = useState("");
@@ -22,6 +34,21 @@ export function UploadForm({ onSubmit, loading }: UploadFormProps) {
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [profiles, setProfiles] = useState<StudentProfile[]>([]);
+  const [selectedProfileId, setSelectedProfileId] = useState<string>("");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isTeacher) return;
+    fetch("/api/student-profiles")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: StudentProfile[]) => {
+        setProfiles(data);
+        const defaultProfile = data.find((p) => p.isDefault);
+        if (defaultProfile) setSelectedProfileId(defaultProfile.id);
+      })
+      .catch(() => {});
+  }, [isTeacher]);
 
   const handleFiles = useCallback((newFiles: FileList | null) => {
     if (!newFiles) return;
@@ -106,6 +133,7 @@ export function UploadForm({ onSubmit, loading }: UploadFormProps) {
       sourceType,
       topic: sourceType === "topic" ? topic.trim() : undefined,
       fileUrls,
+      studentProfileId: isTeacher && selectedProfileId ? selectedProfileId : undefined,
     });
   };
 
@@ -233,6 +261,47 @@ export function UploadForm({ onSubmit, loading }: UploadFormProps) {
             </ul>
           )}
         </div>
+      )}
+
+      {isTeacher && (
+        <details
+          open={advancedOpen}
+          onToggle={(e) => setAdvancedOpen((e.target as HTMLDetailsElement).open)}
+          className="rounded-md border"
+        >
+          <summary className="cursor-pointer px-4 py-3 text-sm font-medium select-none">
+            Advanced Settings
+          </summary>
+          <div className="border-t px-4 py-4 space-y-3">
+            <div>
+              <label htmlFor="student-profile" className="mb-1 block text-sm font-medium">
+                Student Profile
+              </label>
+              <p className="mb-1 text-xs text-muted-foreground">
+                Select the student group this course is designed for.
+              </p>
+              <select
+                id="student-profile"
+                value={selectedProfileId}
+                onChange={(e) => setSelectedProfileId(e.target.value)}
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                disabled={busy}
+              >
+                <option value="">No specific profile</option>
+                {profiles.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}{p.description ? ` — ${p.description}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              <Link href="/dashboard/settings" className="underline underline-offset-2">
+                Manage student profiles →
+              </Link>
+            </p>
+          </div>
+        </details>
       )}
 
       {error && (

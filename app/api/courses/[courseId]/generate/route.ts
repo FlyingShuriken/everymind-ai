@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateCourse, type CourseInput } from "@/lib/ai/course-generator";
-import { extractContent } from "@/lib/documents/extract";
+import { extractContent, extractPageChunks } from "@/lib/documents/extract";
 import { storageGet } from "@/lib/storage";
 
 export async function POST(
@@ -23,6 +23,7 @@ export async function POST(
 
   const course = await prisma.course.findFirst({
     where: { id: courseId, creatorId: user.id },
+    include: { studentProfile: true },
   });
 
   if (!course) {
@@ -46,27 +47,54 @@ export async function POST(
       course.sourceMaterials as string,
     ) as Array<{ type: string; url?: string; text?: string }>;
 
-    const input: CourseInput = {};
+    const DOCX_MIME =
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    const PDF_MIME = "application/pdf";
 
-    for (const source of sources) {
-      if (source.type === "topic") {
-        input.text = (input.text ?? "") + (source.text ?? "");
-      } else if (source.type === "file" && source.url) {
-        const buffer = await storageGet(source.url);
-        const mimeType = source.url.endsWith(".docx")
-          ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-          : "application/pdf";
-        const extracted = await extractContent(buffer, mimeType);
+    const fileSources = sources.filter((s) => s.type === "file" && s.url);
+    const textSources = sources.filter((s) => s.type === "topic");
 
-        if (extracted.type === "images" && extracted.images) {
-          input.images = [...(input.images ?? []), ...extracted.images];
-        } else if (extracted.text) {
-          input.text = (input.text ?? "") + extracted.text + "\n\n";
+    // Extract all files in parallel
+    const fileInputs = await Promise.all(
+      fileSources.map(async (source) => {
+        const buffer = await storageGet(source.url!);
+        const mimeType = source.url!.endsWith(".docx") ? DOCX_MIME : PDF_MIME;
+        if (mimeType === PDF_MIME) {
+          return { type: "pdf" as const, chunks: await extractPageChunks(buffer) };
+        } else {
+          const extracted = await extractContent(buffer, mimeType);
+          return { type: "text" as const, text: extracted.text ?? "" };
         }
-      }
-    }
+      }),
+    );
 
-    if (!input.text?.trim() && !input.images?.length) {
+    const filePdfs = fileInputs
+      .filter((f) => f.type === "pdf")
+      .map((f) => f.chunks!);
+
+    const textParts = [
+      ...textSources.map((s) => s.text ?? ""),
+      ...fileInputs.filter((f) => f.type === "text").map((f) => f.text!),
+    ].filter(Boolean);
+
+    const input: CourseInput = {
+      filePdfs: filePdfs.length ? filePdfs : undefined,
+      text: textParts.length ? textParts.join("\n\n") : undefined,
+      studentProfile: course.studentProfile
+        ? {
+            disabilities: course.studentProfile.disabilities as string[],
+            preferences: course.studentProfile.preferences as string[],
+            accessibilityNeeds: course.studentProfile.accessibilityNeeds as {
+              fontSize: string;
+              highContrast: boolean;
+              reducedMotion: boolean;
+              screenReaderOptimized: boolean;
+            },
+          }
+        : undefined,
+    };
+
+    if (!input.text?.trim() && !input.filePdfs?.length) {
       throw new Error("No content could be extracted from source materials");
     }
 

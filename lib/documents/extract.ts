@@ -7,22 +7,44 @@ export interface ExtractedContent {
   images?: string[]; // base64 data URLs
 }
 
-export async function extractFromPdf(buffer: Buffer): Promise<ExtractedContent> {
+export interface PageChunk {
+  pages: string[]; // base64 data URLs
+  chunkIndex: number;
+  totalChunks: number;
+}
+
+export async function extractPageChunks(
+  buffer: Buffer,
+  chunkSize = 4,
+): Promise<PageChunk[]> {
   const parser = new PDFParse({
     verbosity: 0,
     data: new Uint8Array(buffer),
   });
-  const MAX_PAGES = 10;
   await parser.load();
   const result = await parser.getScreenshot({ imageDataUrl: true, scale: 1 });
   await parser.destroy();
 
-  const images = result.pages
-    .slice(0, MAX_PAGES)
+  const allPages: string[] = result.pages
     .map((p: { dataUrl: string }) => p.dataUrl)
     .filter(Boolean);
 
-  return { type: "images", images };
+  const chunks: PageChunk[] = [];
+  for (let i = 0; i < allPages.length; i += chunkSize) {
+    chunks.push({
+      pages: allPages.slice(i, i + chunkSize),
+      chunkIndex: chunks.length,
+      totalChunks: Math.ceil(allPages.length / chunkSize),
+    });
+  }
+
+  // Fix totalChunks now that we know the final count
+  const total = chunks.length;
+  for (const chunk of chunks) {
+    chunk.totalChunks = total;
+  }
+
+  return chunks;
 }
 
 export async function extractFromDocx(buffer: Buffer): Promise<ExtractedContent> {
@@ -35,8 +57,11 @@ export async function extractContent(
   mimeType: string,
 ): Promise<ExtractedContent> {
   switch (mimeType) {
-    case "application/pdf":
-      return extractFromPdf(buffer);
+    case "application/pdf": {
+      const chunks = await extractPageChunks(buffer);
+      const allImages = chunks.flatMap((c) => c.pages);
+      return { type: "images", images: allImages };
+    }
     case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
       return extractFromDocx(buffer);
     default:

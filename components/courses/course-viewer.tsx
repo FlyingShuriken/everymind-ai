@@ -1,5 +1,8 @@
 "use client";
 
+import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { AudioPlayer } from "./audio-player";
 
 interface SectionData {
@@ -38,12 +41,14 @@ export function CourseViewer({ courseId, contents }: CourseViewerProps) {
               </summary>
 
               <div className="mt-4 space-y-4 pl-1">
-                <div
-                  className="prose prose-sm max-w-none"
-                  dangerouslySetInnerHTML={{
-                    __html: markdownToHtml(data.body),
-                  }}
-                />
+                <div className="prose prose-sm max-w-none">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkMath]}
+                    rehypePlugins={[rehypeKatex]}
+                  >
+                    {data.body}
+                  </ReactMarkdown>
+                </div>
 
                 {data.keyTerms.length > 0 && (
                   <details className="rounded-md border p-3">
@@ -83,20 +88,6 @@ export function CourseViewer({ courseId, contents }: CourseViewerProps) {
   );
 }
 
-function markdownToHtml(md: string): string {
-  return md
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
-    .replace(/^## (.+)$/gm, "<h3>$1</h3>")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/^- (.+)$/gm, "<li>$1</li>")
-    .replace(/(<li>.*<\/li>\n?)+/g, "<ul>$&</ul>")
-    .replace(/\n\n/g, "</p><p>")
-    .replace(/^(?!<[hul])(.+)$/gm, "<p>$1</p>");
-}
 
 function stripMarkdown(md: string): string {
   return md

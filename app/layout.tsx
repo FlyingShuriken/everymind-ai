@@ -5,6 +5,7 @@ import { SkipNav } from "@/components/layout/skip-nav";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import "./globals.css";
+import "katex/dist/katex.min.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
