@@ -1,7 +1,13 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { generateCourse, type CourseInput } from "@/lib/ai/course-generator";
+import { generateCourse, type CourseInput, withConcurrency } from "@/lib/ai/course-generator";
+import { generateQuiz } from "@/lib/ai/quiz-generator";
+import { generateSpeech } from "@/lib/ai/tts";
+import { generateSectionImages } from "@/lib/ai/imagen";
+import { generatePodcast } from "@/lib/ai/notebooklm";
+import { generateSectionVideo } from "@/lib/ai/veo";
+import { generateInteractiveExercises } from "@/lib/ai/interactive";
 import { extractContent, extractPageChunks } from "@/lib/documents/extract";
 import { storageGet } from "@/lib/storage";
 
@@ -108,8 +114,10 @@ export async function POST(
       },
     });
 
+    // Save text sections and collect their IDs
+    const textContentIds: string[] = [];
     for (let i = 0; i < sections.length; i++) {
-      await prisma.courseContent.create({
+      const content = await prisma.courseContent.create({
         data: {
           courseId,
           contentType: "TEXT",
@@ -120,7 +128,177 @@ export async function POST(
           orderIndex: i,
         },
       });
+      textContentIds.push(content.id);
     }
+
+    // Generate quiz
+    const quizTask = async () => {
+      try {
+        const quiz = await generateQuiz(
+          outline.title,
+          sections.map((s) => s.summary),
+        );
+        await prisma.courseContent.create({
+          data: {
+            courseId,
+            contentType: "QUIZ",
+            contentData: JSON.stringify(quiz),
+            metadata: JSON.stringify({}),
+            orderIndex: sections.length,
+          },
+        });
+      } catch (err) {
+        console.error("[generate] Quiz generation failed:", err);
+      }
+    };
+
+    // Generate per-section TTS narration
+    const ttsTask = async () => {
+      await withConcurrency(
+        sections.map((section, i) => async () => {
+          try {
+            const audioUrl = await generateSpeech(
+              `${section.title}. ${section.body}`,
+              textContentIds[i],
+            );
+            await prisma.courseContent.update({
+              where: { id: textContentIds[i] },
+              data: {
+                metadata: JSON.stringify({
+                  outlineSection: outline.sections[i],
+                  audioUrl,
+                }),
+              },
+            });
+          } catch (err) {
+            console.error(`[generate] TTS failed for section ${i}:`, err);
+          }
+        }),
+        3,
+      );
+    };
+
+    const outputModes = ((course.studentProfile?.outputModes ?? []) as string[]);
+
+    // Podcast generation (NotebookLM)
+    const podcastTask = async () => {
+      if (!outputModes.includes("audio")) return;
+      try {
+        const allText = sections
+          .map((s, i) => `## ${outline.sections[i].title}\n\n${s.body}`)
+          .join("\n\n---\n\n");
+        const podcastUrl = await generatePodcast(outline.title, allText, courseId);
+        await prisma.courseContent.create({
+          data: {
+            courseId,
+            contentType: "PODCAST",
+            contentData: JSON.stringify({ podcastUrl, courseTitle: outline.title }),
+            metadata: JSON.stringify({}),
+            orderIndex: 0,
+          },
+        });
+      } catch (err) {
+        console.error("[generate] Podcast generation failed:", err);
+      }
+    };
+
+    // Visual generation (Imagen 3)
+    const visualTask = async () => {
+      if (!outputModes.includes("visual")) return;
+      await withConcurrency(
+        sections.map((section, i) => async () => {
+          try {
+            const images = await generateSectionImages(
+              section.title,
+              section.body,
+              outline.title,
+              i,
+            );
+            if (images.length > 0) {
+              await prisma.courseContent.create({
+                data: {
+                  courseId,
+                  contentType: "VISUAL",
+                  contentData: JSON.stringify({ images, sectionTitle: section.title }),
+                  metadata: JSON.stringify({ sectionIndex: i }),
+                  orderIndex: i,
+                },
+              });
+            }
+          } catch (err) {
+            console.error(`[generate] Visual generation failed for section ${i}:`, err);
+          }
+        }),
+        2,
+      );
+    };
+
+    // Video generation (Veo 3.1 Fast)
+    const videoTask = async () => {
+      if (!outputModes.includes("video")) return;
+      await withConcurrency(
+        sections.map((section, i) => async () => {
+          try {
+            const videoUrl = await generateSectionVideo(
+              section.title,
+              section.summary,
+              outline.title,
+              i,
+            );
+            await prisma.courseContent.create({
+              data: {
+                courseId,
+                contentType: "VIDEO",
+                contentData: JSON.stringify({ videoUrl, sectionTitle: section.title }),
+                metadata: JSON.stringify({ sectionIndex: i }),
+                orderIndex: i,
+              },
+            });
+          } catch (err) {
+            console.error(`[generate] Video generation failed for section ${i}:`, err);
+          }
+        }),
+        1, // Videos are expensive — generate one at a time
+      );
+    };
+
+    // Interactive exercises (Gemini)
+    const interactiveTask = async () => {
+      if (!outputModes.includes("interactive")) return;
+      await withConcurrency(
+        sections.map((section, i) => async () => {
+          try {
+            const exercises = await generateInteractiveExercises(
+              section.title,
+              section.body,
+              section.summary,
+            );
+            await prisma.courseContent.create({
+              data: {
+                courseId,
+                contentType: "INTERACTIVE",
+                contentData: JSON.stringify(exercises),
+                metadata: JSON.stringify({ sectionIndex: i }),
+                orderIndex: i,
+              },
+            });
+          } catch (err) {
+            console.error(`[generate] Interactive generation failed for section ${i}:`, err);
+          }
+        }),
+        3,
+      );
+    };
+
+    // Run all generation tasks (text is already saved; these run in parallel)
+    await Promise.allSettled([
+      quizTask(),
+      ttsTask(),
+      podcastTask(),
+      visualTask(),
+      videoTask(),
+      interactiveTask(),
+    ]);
 
     await prisma.course.update({
       where: { id: courseId },

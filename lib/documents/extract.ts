@@ -21,7 +21,6 @@ export async function extractPageChunks(
     verbosity: 0,
     data: new Uint8Array(buffer),
   });
-  await parser.load();
   const result = await parser.getScreenshot({ imageDataUrl: true, scale: 1 });
   await parser.destroy();
 

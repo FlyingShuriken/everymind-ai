@@ -1,4 +1,4 @@
-import { openai, MODEL } from "./openai";
+import { genai, GEMINI_MODEL } from "./vertex";
 import { parseAIJson } from "./parse-json";
 import type { PageChunk } from "@/lib/documents/extract";
 
@@ -81,7 +81,7 @@ function buildStudentContextInstructions(profile: StudentProfileInput): string {
 
 // --- Concurrency helper ---
 
-async function withConcurrency<T>(
+export async function withConcurrency<T>(
   tasks: (() => Promise<T>)[],
   limit: number,
 ): Promise<T[]> {
@@ -110,21 +110,11 @@ async function summarizeChunk(chunk: PageChunk): Promise<string> {
     `[course-generator] Summarizing chunk ${chunk.chunkIndex + 1}/${chunk.totalChunks} (pages ${start}–${end})`,
   );
 
-  const response = await openai.chat.completions.create({
-    model: MODEL,
-    messages: [
-      {
-        role: "system",
-        content: `You are a senior academic content analyst with 15+ years of experience extracting structured knowledge from educational materials across STEM, humanities, and professional domains.
+  const systemPrompt = `You are a senior academic content analyst with 15+ years of experience extracting structured knowledge from educational materials across STEM, humanities, and professional domains.
 
-Your extractions are used downstream to generate complete courses, so completeness and precision are critical. Never paraphrase where quoting a definition or formula is more accurate. Never omit data, figures, or examples — they are often the most teachable content.`,
-      },
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: `You are analyzing pages ${start}–${end} of ${chunk.totalChunks * chunk.pages.length} total pages. This is chunk ${chunk.chunkIndex + 1} of ${chunk.totalChunks}.
+Your extractions are used downstream to generate complete courses, so completeness and precision are critical. Never paraphrase where quoting a definition or formula is more accurate. Never omit data, figures, or examples — they are often the most teachable content.`;
+
+  const userText = `You are analyzing pages ${start}–${end} of ${chunk.totalChunks * chunk.pages.length} total pages. This is chunk ${chunk.chunkIndex + 1} of ${chunk.totalChunks}.
 
 Think through each page carefully before writing your extraction:
 
@@ -146,18 +136,27 @@ A good extraction looks like this:
 This section introduces [concept], defined as [exact definition]. It explains that [key relationship or mechanism]. For example, [description of example from page]. The diagram on this page shows [description and key takeaway]. The key formula presented is [formula].
 ---
 
-Now extract pages ${start}–${end}:`,
-          },
-          ...chunk.pages.map((dataUrl) => ({
-            type: "image_url" as const,
-            image_url: { url: dataUrl, detail: "auto" as const },
-          })),
-        ],
-      },
-    ],
+Now extract pages ${start}–${end}:`;
+
+  const imageParts = chunk.pages.map((dataUrl) => {
+    // dataUrl is like "data:image/png;base64,..."
+    const [header, data] = dataUrl.split(",");
+    const mimeType = header.replace("data:", "").replace(";base64", "") as "image/png" | "image/jpeg";
+    return { inlineData: { mimeType, data } };
   });
 
-  return response.choices[0].message.content ?? "";
+  const response = await genai.models.generateContent({
+    model: GEMINI_MODEL,
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: userText }, ...imageParts],
+      },
+    ],
+    config: { systemInstruction: systemPrompt },
+  });
+
+  return response.text ?? "";
 }
 
 // --- Pass 1b: Collapse chunk summaries into one file-level summary ---
@@ -175,23 +174,26 @@ async function summarizeFile(
     .map((s, i) => `=== CHUNK ${i + 1} OF ${chunkSummaries.length} ===\n${s}`)
     .join("\n\n");
 
-  const response = await openai.chat.completions.create({
-    model: MODEL,
-    messages: [
-      {
-        role: "system",
-        content: `You are a senior academic content analyst. You synthesize section-level summaries into one comprehensive document summary that preserves all topics, definitions, formulas, and examples. Your output will be used to generate a course outline.`,
-      },
+  const response = await genai.models.generateContent({
+    model: GEMINI_MODEL,
+    contents: [
       {
         role: "user",
-        content: `You have received summaries of each section of document ${fileIndex + 1} of ${totalFiles}. Synthesize them into a single comprehensive summary preserving all topics, definitions, formulas, and examples. Maintain document structure (intro → core → conclusion). Use clear ## headings for each major topic.
+        parts: [
+          {
+            text: `You have received summaries of each section of document ${fileIndex + 1} of ${totalFiles}. Synthesize them into a single comprehensive summary preserving all topics, definitions, formulas, and examples. Maintain document structure (intro → core → conclusion). Use clear ## headings for each major topic.
 
 ${combined}`,
+          },
+        ],
       },
     ],
+    config: {
+      systemInstruction: `You are a senior academic content analyst. You synthesize section-level summaries into one comprehensive document summary that preserves all topics, definitions, formulas, and examples. Your output will be used to generate a course outline.`,
+    },
   });
 
-  return response.choices[0].message.content ?? combined;
+  return response.text ?? combined;
 }
 
 // --- Pass 2a: Generate outline from summaries ---
@@ -208,12 +210,7 @@ async function generateOutlineFromSummaries(
     `[course-generator] Generating outline from ${summaries.length} summaries`,
   );
 
-  const response = await openai.chat.completions.create({
-    model: MODEL,
-    messages: [
-      {
-        role: "system",
-        content: `You are a lead curriculum designer with expertise in Universal Design for Learning (UDL), Bloom's Taxonomy, and accessible education for students with disabilities (ADHD, dyslexia, visual/hearing impairments).
+  const systemPrompt = `You are a lead curriculum designer with expertise in Universal Design for Learning (UDL), Bloom's Taxonomy, and accessible education for students with disabilities (ADHD, dyslexia, visual/hearing impairments).
 
 Your outlines must be:
 - Grounded strictly in the source material (no invented topics)
@@ -221,11 +218,16 @@ Your outlines must be:
 - Scoped so each section can be taught in 15–30 minutes
 - Written with measurable Bloom's-level verbs in learning objectives (e.g., "identify", "explain", "apply", "analyze", "compare")
 ${studentProfile ? buildStudentContextInstructions(studentProfile) : ""}
-Respond with ONLY valid JSON. No markdown fences, no preamble, no trailing text.`,
-      },
+Respond with ONLY valid JSON. No markdown fences, no preamble, no trailing text.`;
+
+  const response = await genai.models.generateContent({
+    model: GEMINI_MODEL,
+    contents: [
       {
         role: "user",
-        content: `Design a course outline from the following extracted source material.
+        parts: [
+          {
+            text: `Design a course outline from the following extracted source material.
 
 ${combinedContext}
 
@@ -256,11 +258,14 @@ Before finalizing, verify:
 ✓ Learning objectives use measurable verbs, not "understand" or "know"
 ✓ Sections flow from foundational to advanced
 ✓ No major topic from the source is omitted`,
+          },
+        ],
       },
     ],
+    config: { systemInstruction: systemPrompt },
   });
 
-  return parseAIJson<CourseOutline>(response.choices[0].message.content!);
+  return parseAIJson<CourseOutline>(response.text!);
 }
 
 // --- Pass 2b: Generate a single section with source context ---
@@ -279,12 +284,7 @@ async function generateSectionWithContext(
 ): Promise<SectionContent> {
   const sourceContext = allSummaries.join("\n\n---\n\n");
 
-  const response = await openai.chat.completions.create({
-    model: MODEL,
-    messages: [
-      {
-        role: "system",
-        content: `You are a senior educational content writer who specializes in accessible learning materials for students with diverse needs (ADHD, dyslexia, hearing/visual impairments, learning disabilities).
+  const systemPrompt = `You are a senior educational content writer who specializes in accessible learning materials for students with diverse needs (ADHD, dyslexia, hearing/visual impairments, learning disabilities).
 
 Your writing principles:
 - Every claim must be grounded in the source material — no hallucinated facts
@@ -296,11 +296,16 @@ Your writing principles:
 - Numbered lists for sequences or steps; bullet lists for non-ordered sets
 - For mathematical expressions, use LaTeX notation: $inline$ for inline math, $$block$$ for display equations — only when the subject genuinely requires it (math, physics, chemistry, etc.)
 ${studentProfile ? buildStudentContextInstructions(studentProfile) : ""}
-Respond with ONLY valid JSON. No markdown fences, no preamble, no trailing text.`,
-      },
+Respond with ONLY valid JSON. No markdown fences, no preamble, no trailing text.`;
+
+  const response = await genai.models.generateContent({
+    model: GEMINI_MODEL,
+    contents: [
       {
         role: "user",
-        content: `Write the full content for the section below. Stay strictly within the source material — do not invent examples or facts not present in it.
+        parts: [
+          {
+            text: `Write the full content for the section below. Stay strictly within the source material — do not invent examples or facts not present in it.
 
 COURSE: ${courseTitle}
 SECTION: ${section.title}
@@ -337,11 +342,14 @@ Before finalizing, verify:
 ✓ All bolded terms appear in keyTerms
 ✓ No facts or examples were invented — all are traceable to source material
 ✓ Body is between ${sectionWordRange("medium")} words`,
+          },
+        ],
       },
     ],
+    config: { systemInstruction: systemPrompt },
   });
 
-  return parseAIJson<SectionContent>(response.choices[0].message.content!);
+  return parseAIJson<SectionContent>(response.text!);
 }
 
 // --- Public API ---

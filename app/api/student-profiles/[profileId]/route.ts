@@ -16,6 +16,7 @@ const updateSchema = z.object({
       screenReaderOptimized: z.boolean(),
     })
     .optional(),
+  outputModes: z.array(z.enum(["audio", "visual", "video", "interactive"])).optional(),
   isDefault: z.boolean().optional(),
 });
 

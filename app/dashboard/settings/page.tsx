@@ -4,6 +4,15 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DISABILITY_OPTIONS, PREFERENCE_OPTIONS, FONT_SIZE_OPTIONS } from "@/lib/constants";
 
+type OutputMode = "audio" | "visual" | "video" | "interactive";
+
+const OUTPUT_MODE_OPTIONS: { value: OutputMode; label: string; description: string }[] = [
+  { value: "audio", label: "Audio (Podcast)", description: "Full conversational AI podcast of the course" },
+  { value: "visual", label: "Visual", description: "AI-generated illustrations for each section" },
+  { value: "video", label: "Video", description: "Short explainer videos per section" },
+  { value: "interactive", label: "Interactive", description: "Embedded exercises and activities" },
+];
+
 interface StudentProfile {
   id: string;
   name: string;
@@ -16,6 +25,7 @@ interface StudentProfile {
     reducedMotion: boolean;
     screenReaderOptimized: boolean;
   };
+  outputModes: OutputMode[];
   isDefault: boolean;
 }
 
@@ -30,6 +40,7 @@ type FormState = {
     reducedMotion: boolean;
     screenReaderOptimized: boolean;
   };
+  outputModes: OutputMode[];
   isDefault: boolean;
 };
 
@@ -44,6 +55,7 @@ const defaultForm: FormState = {
     reducedMotion: false,
     screenReaderOptimized: false,
   },
+  outputModes: [],
   isDefault: false,
 };
 
@@ -89,6 +101,7 @@ export default function SettingsPage() {
       disabilities: profile.disabilities,
       preferences: profile.preferences,
       accessibilityNeeds: profile.accessibilityNeeds,
+      outputModes: profile.outputModes ?? [],
       isDefault: profile.isDefault,
     });
     setError(null);
@@ -318,6 +331,36 @@ export default function SettingsPage() {
               </div>
             </fieldset>
 
+            <fieldset>
+              <legend className="mb-2 text-sm font-medium">Output Formats</legend>
+              <p className="mb-2 text-xs text-muted-foreground">
+                Select which additional content formats to generate when creating courses with this profile. Text is always generated.
+              </p>
+              <div className="space-y-2">
+                {OUTPUT_MODE_OPTIONS.map((option) => (
+                  <label key={option.value} className="flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={form.outputModes.includes(option.value)}
+                      onChange={() =>
+                        setForm((f) => ({
+                          ...f,
+                          outputModes: toggleArrayItem(f.outputModes, option.value) as OutputMode[],
+                        }))
+                      }
+                      disabled={saving}
+                    />
+                    <span>
+                      <span className="font-medium">{option.label}</span>
+                      {" — "}
+                      <span className="text-muted-foreground">{option.description}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -394,6 +437,18 @@ export default function SettingsPage() {
                         return (
                           <span key={p} className="rounded bg-muted px-2 py-0.5 text-xs">
                             {option?.label ?? p}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {profile.outputModes?.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {profile.outputModes.map((m) => {
+                        const option = OUTPUT_MODE_OPTIONS.find((o) => o.value === m);
+                        return (
+                          <span key={m} className="rounded bg-green-50 px-2 py-0.5 text-xs text-green-700">
+                            {option?.label ?? m}
                           </span>
                         );
                       })}

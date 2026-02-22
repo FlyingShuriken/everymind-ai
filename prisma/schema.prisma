@@ -37,6 +37,10 @@ enum ContentType {
   TEXT
   AUDIO
   QUIZ
+  PODCAST
+  VISUAL
+  VIDEO
+  INTERACTIVE
 }
 
 model Course {
@@ -65,6 +69,7 @@ model StudentProfile {
   disabilities       Json     @default("[]")
   preferences        Json     @default("[]")
   accessibilityNeeds Json     @default("{}")
+  outputModes        Json     @default("[]")
   isDefault          Boolean  @default(false)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt

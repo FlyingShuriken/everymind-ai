@@ -15,7 +15,8 @@ const studentProfileSchema = z.object({
       reducedMotion: z.boolean().default(false),
       screenReaderOptimized: z.boolean().default(false),
     })
-    .default({}),
+    .default({ fontSize: "medium", highContrast: false, reducedMotion: false, screenReaderOptimized: false }),
+  outputModes: z.array(z.enum(["audio", "visual", "video", "interactive"])).default([]),
   isDefault: z.boolean().default(false),
 });
 
