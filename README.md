@@ -21,7 +21,7 @@ EveryMind.ai is an end-to-end platform that:
 3. **Generates** personalized courses automatically in multiple formats
 4. **Delivers** content in the format that works best for each student
 
-The same material becomes a structured text course, an audio narration, and an interactive quiz — all generated automatically and tailored to the student's profile.
+The same material becomes a structured text course, audio narration, a conversational podcast, visual illustrations, short video explainers, and interactive exercises — all generated automatically and tailored to the student's profile.
 
 ---
 
@@ -32,7 +32,7 @@ Unlike existing adaptive learning platforms (DreamBox, Knewton, Coursebox, eduMe
 | Feature | Most Platforms | EveryMind.ai |
 |---|---|---|
 | Accessibility | Add-on afterthought | Designed from day one |
-| Scope | Single purpose (convert OR deliver) | End-to-end (assess → generate → deliver) |
+| Scope | Single purpose (convert OR deliver) | End-to-end (assess -> generate -> deliver) |
 | Content | Converts existing materials | Generates multimodal formats from any input |
 | Users | Students OR teachers | Both, in a single platform |
 | Science | Often based on learning styles myth | Grounded in UDL research |
@@ -68,7 +68,7 @@ EveryMind.ai does not restrict content based on assumed styles. Instead, it prov
 
 **Teachers** who want to:
 - Upload existing materials and get accessible versions automatically
-- Create courses for students with specific accessibility needs
+- Create student profiles with specific disabilities and output mode preferences
 - Deliver content in multiple formats without manual reformatting
 
 ---
@@ -78,30 +78,38 @@ EveryMind.ai does not restrict content based on assumed styles. Instead, it prov
 ### For Students
 1. Sign up and complete a short onboarding assessment (disabilities, preferences, accessibility needs)
 2. Browse courses created by teachers or generate your own from any topic
-3. Learn through text, audio narration, and interactive quizzes
-4. Track progress across all content
+3. Learn through text, audio narration, podcasts, images, videos, and interactive exercises
+4. Take quizzes and track progress across all content
 
 ### For Teachers
-1. Upload PDFs or DOCX files — lecture notes, textbooks, handouts
-2. The platform extracts content and generates a full structured course
-3. Students receive content in their preferred, accessible formats automatically
+1. Create student profiles with specific disabilities, preferences, and output modes (Settings)
+2. Upload PDFs or DOCX files — lecture notes, textbooks, handouts
+3. The platform extracts content and generates a full structured course
+4. Students receive content in their accessible formats automatically
+5. Share courses via link
 
 ### The Generation Pipeline
 
 ```
-Upload PDF/DOCX
-      ↓
-Extract content (PDF pages → AI vision; DOCX → plain text)
-      ↓
-AI generates course outline (4–8 sections)
-      ↓
-AI expands each section into full content
-      ↓
-AI generates quiz questions from material
-      ↓
-OpenAI TTS generates audio narration
-      ↓
-Course ready: Text + Audio + Quiz
+Upload PDF/DOCX or enter topic
+      |
+Extract content (PDF pages -> Gemini vision; DOCX -> mammoth plain text)
+      |
+Hierarchical summarization (chunk pages -> summarize -> collapse)
+      |
+AI generates course outline (5-8 sections with learning objectives)
+      |
+AI expands each section into full markdown content (adapted to student profile)
+      |
+In parallel:
+  +-- Quiz generation (5-10 questions)
+  +-- TTS audio narration (per section, always)
+  +-- Podcast generation (NotebookLM, if outputMode="audio")
+  +-- Image generation (Imagen 4.0 Fast, if outputMode="visual")
+  +-- Video generation (Veo 3.1 Fast, if outputMode="video")
+  +-- Interactive exercises (fill-in-blank, MCQ, short answer, if outputMode="interactive")
+      |
+Course ready: Text + Audio + selected modes
 ```
 
 ---
@@ -110,23 +118,27 @@ Course ready: Text + Audio + Quiz
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 15, React 19, TypeScript, Tailwind CSS, shadcn/ui |
-| Backend | Next.js API Routes |
+| Frontend | Next.js 15, React 19, TypeScript, Tailwind CSS 4, shadcn/ui |
+| Backend | Next.js API Routes (single codebase) |
 | Database | PostgreSQL (Supabase) via Prisma 7 |
 | Authentication | Clerk |
-| AI (Text & Reasoning) | OpenRouter → configurable model (default: GPT-4o) |
-| AI (Audio) | OpenAI TTS |
-| Document Extraction | PDF vision rendering + Mammoth (DOCX) |
+| AI (Text, Quiz, Interactive) | Gemini 3 Flash Preview via `@google/genai` |
+| AI (Audio Narration) | Gemini 2.5 Flash TTS |
+| AI (Podcast) | NotebookLM Podcast API |
+| AI (Images) | Imagen 4.0 Fast |
+| AI (Video) | Veo 3.1 Fast |
+| Document Extraction | Gemini vision (PDF screenshots) + mammoth (DOCX) |
 | File Storage | Vercel Blob (production) / local filesystem (development) |
 | Deployment | Vercel |
 
 ### Accessibility Stack
 
 - **shadcn/ui** — built on Radix UI primitives, WAI-ARIA compliant by default
-- **eslint-plugin-jsx-a11y** — accessibility linting on every commit
+- **eslint-plugin-jsx-a11y** — accessibility linting
+- **@axe-core/react** — runtime accessibility testing in development (console warnings)
 - **WCAG 2.2** — target compliance (4.5:1 contrast, POUR principles)
 - **Semantic HTML first** — native elements over custom ARIA widgets
-- **VoiceOver / NVDA / JAWS** — tested across major screen readers
+- **VoiceOver / NVDA** — tested across major screen readers
 
 ---
 
@@ -146,10 +158,10 @@ Despite this growth, no platform has combined accessibility-native design, end-t
 
 | Phase | Scope | Status |
 |---|---|---|
-| Weeks 1–2 | Foundation: auth, database, onboarding assessment | ✅ Complete |
-| Weeks 3–4 | Core AI: document processing, course generation, audio | ✅ Complete |
-| Weeks 5–6 | Multimodal: images, progress tracking, teacher dashboard | 🔄 In progress |
-| Weeks 7–8 | Accessibility testing, real user testing, launch | ⏳ Upcoming |
+| Weeks 1-2 | Foundation: auth, database, onboarding assessment | Complete |
+| Weeks 3-4 | Core AI: document processing, course generation, audio | Complete |
+| Weeks 5-6 | Multimodal: images, video, podcast, interactive exercises, progress tracking | Complete |
+| Weeks 7-8 | Accessibility testing, polish, deployment | In progress |
 
 ---
 
@@ -161,7 +173,7 @@ pnpm install
 
 # Set up environment variables
 cp .env.example .env.local
-# Fill in: DATABASE_URL, OPENROUTER_API_KEY, Clerk keys
+# Fill in: DATABASE_URL, GOOGLE_API_KEY, Clerk keys
 
 # Run database migrations
 pnpm prisma migrate dev
@@ -176,6 +188,6 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Further Reading
 
-- [`RESEARCH.md`](./RESEARCH.md) — Full market research, UDL framework, disability-specific technologies, competitor analysis
-- [`TECH.md`](./TECH.md) — Complete tech stack rationale, AI service comparisons, cost analysis, implementation roadmap
+- [`docs/RESEARCH.md`](./docs/RESEARCH.md) — Full market research, UDL framework, disability-specific technologies, competitor analysis
+- [`docs/TECH.md`](./docs/TECH.md) — Complete tech stack details, AI services, cost analysis, implementation roadmap
 - [`CLAUDE.md`](./CLAUDE.md) — Codebase guide for AI-assisted development
