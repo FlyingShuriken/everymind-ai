@@ -39,9 +39,7 @@ export async function GET(
     progressMap[row.contentId] = {
       completed: row.completed,
       timeSpent: row.timeSpent,
-      performanceData: row.performanceData
-        ? JSON.parse(row.performanceData as string)
-        : null,
+      performanceData: row.performanceData ?? null,
     };
   }
 
