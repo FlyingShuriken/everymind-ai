@@ -7,6 +7,7 @@ interface CourseCardProps {
   description?: string | null;
   status: string;
   createdAt: string;
+  progressPercent?: number;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -22,6 +23,7 @@ export function CourseCard({
   description,
   status,
   createdAt,
+  progressPercent,
 }: CourseCardProps) {
   return (
     <Card>
@@ -57,6 +59,23 @@ export function CourseCard({
         <p className="text-xs text-muted-foreground">
           Created {new Date(createdAt).toLocaleDateString()}
         </p>
+        {progressPercent !== undefined && status === "READY" && (
+          <div className="mt-3">
+            <div
+              className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+              role="progressbar"
+              aria-valuenow={progressPercent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`${progressPercent}% complete`}
+            >
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

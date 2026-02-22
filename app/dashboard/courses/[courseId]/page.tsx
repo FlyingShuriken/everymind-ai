@@ -13,6 +13,7 @@ interface Course {
   description: string | null;
   status: string;
   generationError: string | null;
+  isCreator: boolean;
   contents: Array<{
     id: string;
     contentType: string;
@@ -31,6 +32,11 @@ interface QuizData {
   }>;
 }
 
+type ProgressMap = Record<
+  string,
+  { completed: boolean; timeSpent: number; performanceData: unknown }
+>;
+
 export default function CourseDetailPage() {
   const { courseId } = useParams<{ courseId: string }>();
   const router = useRouter();
@@ -39,16 +45,25 @@ export default function CourseDetailPage() {
   const [loadingQuiz, setLoadingQuiz] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showQuiz, setShowQuiz] = useState(false);
+  const [progress, setProgress] = useState<ProgressMap>({});
+  const [copied, setCopied] = useState(false);
 
   const fetchCourse = useCallback(async () => {
     try {
-      const res = await fetch(`/api/courses/${courseId}`);
-      if (!res.ok) {
+      const [courseRes, progressRes] = await Promise.all([
+        fetch(`/api/courses/${courseId}`),
+        fetch(`/api/courses/${courseId}/progress`),
+      ]);
+      if (!courseRes.ok) {
         router.push("/dashboard/courses");
         return;
       }
-      const data = await res.json();
+      const data = await courseRes.json();
       setCourse(data);
+      if (progressRes.ok) {
+        const progressData = await progressRes.json();
+        setProgress(progressData);
+      }
     } catch {
       router.push("/dashboard/courses");
     } finally {
@@ -76,6 +91,27 @@ export default function CourseDetailPage() {
     }
   };
 
+  const handleSectionComplete = useCallback(
+    async (contentId: string) => {
+      setProgress((prev) => ({
+        ...prev,
+        [contentId]: { completed: true, timeSpent: 0, performanceData: null },
+      }));
+      await fetch(`/api/courses/${courseId}/progress`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentId, completed: true }),
+      });
+    },
+    [courseId],
+  );
+
+  const handleCopyLink = async () => {
+    await navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   if (loading) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-12">
@@ -86,12 +122,53 @@ export default function CourseDetailPage() {
 
   if (!course) return null;
 
+  const textSections = course.contents.filter((c) => c.contentType === "TEXT");
+  const completedCount = textSections.filter(
+    (c) => progress[c.id]?.completed,
+  ).length;
+  const totalSections = textSections.length;
+  const progressPercent =
+    totalSections > 0 ? Math.round((completedCount / totalSections) * 100) : 0;
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-12">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">{course.title}</h1>
-        {course.description && (
-          <p className="mt-2 text-muted-foreground">{course.description}</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">{course.title}</h1>
+            {course.description && (
+              <p className="mt-2 text-muted-foreground">{course.description}</p>
+            )}
+          </div>
+          {course.isCreator && course.status === "READY" && (
+            <Button variant="outline" size="sm" onClick={handleCopyLink}>
+              {copied ? "Copied!" : "Copy share link"}
+            </Button>
+          )}
+        </div>
+
+        {course.status === "READY" && totalSections > 0 && (
+          <div className="mt-4">
+            <div className="mb-1 flex items-center justify-between text-sm text-muted-foreground">
+              <span>
+                {completedCount} of {totalSections} sections completed
+              </span>
+              <span>{progressPercent}%</span>
+            </div>
+            <div
+              className="h-2 w-full overflow-hidden rounded-full bg-muted"
+              role="progressbar"
+              aria-valuenow={progressPercent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Course progress"
+            >
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
         )}
       </div>
 
@@ -105,7 +182,12 @@ export default function CourseDetailPage() {
 
       {course.status === "READY" && (
         <>
-          <CourseViewer courseId={course.id} contents={course.contents} />
+          <CourseViewer
+            courseId={course.id}
+            contents={course.contents}
+            progress={progress}
+            onSectionComplete={handleSectionComplete}
+          />
 
           <div className="mt-12 border-t pt-8">
             <h2 className="mb-4 text-2xl font-bold">Quiz</h2>

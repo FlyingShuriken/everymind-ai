@@ -27,6 +27,8 @@ interface ContentItem {
 interface CourseViewerProps {
   courseId: string;
   contents: ContentItem[];
+  progress?: Record<string, { completed: boolean }>;
+  onSectionComplete?: (contentId: string) => void;
 }
 
 type Tab = "text" | "podcast" | "visual" | "video" | "interactive";
@@ -48,7 +50,12 @@ function stripMarkdown(md: string): string {
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
 }
 
-export function CourseViewer({ courseId, contents }: CourseViewerProps) {
+export function CourseViewer({
+  courseId,
+  contents,
+  progress = {},
+  onSectionComplete,
+}: CourseViewerProps) {
   const textSections = contents.filter((c) => c.contentType === "TEXT");
   const podcastContent = contents.find((c) => c.contentType === "PODCAST");
   const visualContents = contents.filter((c) => c.contentType === "VISUAL");
@@ -102,11 +109,33 @@ export function CourseViewer({ courseId, contents }: CourseViewerProps) {
             const data: SectionData = JSON.parse(content.contentData);
             const metadata = JSON.parse(content.metadata || "{}");
 
+            const isCompleted = progress[content.id]?.completed ?? false;
+
             return (
               <article key={content.id} className="space-y-4">
-                <details open>
+                <details
+                  onToggle={(e) => {
+                    if (
+                      e.currentTarget.open &&
+                      !isCompleted &&
+                      onSectionComplete
+                    ) {
+                      onSectionComplete(content.id);
+                    }
+                  }}
+                >
                   <summary className="cursor-pointer text-xl font-semibold">
-                    {data.title}
+                    <span className="inline-flex items-center gap-2">
+                      {data.title}
+                      {isCompleted && (
+                        <span
+                          aria-label="Completed"
+                          className="text-base text-green-600"
+                        >
+                          ✓
+                        </span>
+                      )}
+                    </span>
                   </summary>
 
                   <div className="mt-4 space-y-4 pl-1">

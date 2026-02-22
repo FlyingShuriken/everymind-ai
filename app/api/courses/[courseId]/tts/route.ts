@@ -28,7 +28,7 @@ export async function POST(
   }
 
   const content = await prisma.courseContent.findFirst({
-    where: { id: contentId, courseId, course: { creatorId: user.id } },
+    where: { id: contentId, courseId },
   });
 
   if (!content) {

@@ -19,7 +19,7 @@ export async function GET(
   }
 
   const course = await prisma.course.findFirst({
-    where: { id: courseId, creatorId: user.id },
+    where: { id: courseId },
     include: { contents: { orderBy: { orderIndex: "asc" } } },
   });
 
@@ -27,7 +27,7 @@ export async function GET(
     return NextResponse.json({ error: "Course not found" }, { status: 404 });
   }
 
-  return NextResponse.json(course);
+  return NextResponse.json({ ...course, isCreator: course.creatorId === user.id });
 }
 
 export async function DELETE(

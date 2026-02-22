@@ -21,7 +21,7 @@ export async function GET(
   }
 
   const course = await prisma.course.findFirst({
-    where: { id: courseId, creatorId: user.id },
+    where: { id: courseId },
   });
 
   if (!course || course.status !== "READY") {
