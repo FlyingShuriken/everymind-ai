@@ -1,20 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "@/components/ui/toast";
 
 interface GenerationStatusProps {
   courseId: string;
   initialStatus: string;
   onReady: () => void;
+  isCreator?: boolean;
 }
 
 export function GenerationStatus({
   courseId,
   initialStatus,
   onReady,
+  isCreator,
 }: GenerationStatusProps) {
   const [status, setStatus] = useState(initialStatus);
   const [error, setError] = useState<string | null>(null);
+  const pollFailures = useRef(0);
 
   useEffect(() => {
     if (status !== "PROCESSING") return;
@@ -23,6 +27,7 @@ export function GenerationStatus({
       try {
         const res = await fetch(`/api/courses/${courseId}`);
         if (!res.ok) return;
+        pollFailures.current = 0;
         const course = await res.json();
         setStatus(course.status);
         if (course.status === "READY") {
@@ -33,7 +38,12 @@ export function GenerationStatus({
           setError(course.generationError || "Generation failed");
         }
       } catch {
-        // Ignore polling errors
+        pollFailures.current++;
+        if (pollFailures.current >= 5) {
+          clearInterval(interval);
+          toast.error("Lost connection while checking generation status. Please refresh the page.");
+          setError("Connection lost. Please refresh the page.");
+        }
       }
     }, 3000);
 
@@ -60,7 +70,9 @@ export function GenerationStatus({
       )}
       {status === "DRAFT" && (
         <p className="text-sm text-muted-foreground">
-          Course is in draft. Click &quot;Generate&quot; to create content.
+          {isCreator
+            ? "Course is in draft. Click \"Generate\" to create content."
+            : "This course is being prepared. Check back with the teacher once it\u2019s ready."}
         </p>
       )}
     </div>

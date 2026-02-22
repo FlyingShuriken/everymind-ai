@@ -1,8 +1,11 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "@/components/ui/toast";
 import { CourseViewer } from "@/components/courses/course-viewer";
 import { GenerationStatus } from "@/components/courses/generation-status";
 import { Quiz } from "@/components/courses/quiz";
@@ -65,6 +68,7 @@ export default function CourseDetailPage() {
         setProgress(progressData);
       }
     } catch {
+      toast.error("Failed to load course. Redirecting...");
       router.push("/dashboard/courses");
     } finally {
       setLoading(false);
@@ -85,7 +89,8 @@ export default function CourseDetailPage() {
         setQuiz(data);
       }
     } catch {
-      // ignore
+      toast.error("Failed to load quiz. Please try again.");
+      setQuiz(null);
     } finally {
       setLoadingQuiz(false);
     }
@@ -97,25 +102,47 @@ export default function CourseDetailPage() {
         ...prev,
         [contentId]: { completed: true, timeSpent: 0, performanceData: null },
       }));
-      await fetch(`/api/courses/${courseId}/progress`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentId, completed: true }),
-      });
+      try {
+        const res = await fetch(`/api/courses/${courseId}/progress`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contentId, completed: true }),
+        });
+        if (!res.ok) throw new Error();
+      } catch {
+        toast.error("Failed to save progress.");
+      }
     },
     [courseId],
   );
 
   const handleCopyLink = async () => {
-    await navigator.clipboard.writeText(window.location.href);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Failed to copy link.");
+    }
   };
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-12">
-        <p>Loading...</p>
+      <div
+        role="region"
+        aria-label="Loading course"
+        aria-busy="true"
+        className="mx-auto max-w-4xl px-4 py-12"
+      >
+        <h1 className="sr-only">Loading course</h1>
+        <Skeleton className="mb-4 h-8 w-2/3" />
+        <Skeleton className="mb-8 h-4 w-1/2" />
+        <Skeleton className="mb-8 h-2 w-full" />
+        <div className="space-y-4">
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </div>
       </div>
     );
   }
@@ -132,6 +159,11 @@ export default function CourseDetailPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-12">
+      <nav aria-label="Breadcrumb" className="mb-6">
+        <Link href="/dashboard/courses" className="text-sm text-muted-foreground hover:underline">
+          ← Courses
+        </Link>
+      </nav>
       <div className="mb-8">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -177,6 +209,7 @@ export default function CourseDetailPage() {
           courseId={course.id}
           initialStatus={course.status}
           onReady={fetchCourse}
+          isCreator={course.isCreator}
         />
       )}
 
@@ -198,7 +231,9 @@ export default function CourseDetailPage() {
             ) : quiz ? (
               <Quiz courseId={course.id} questions={quiz.questions} />
             ) : (
-              <p>Failed to load quiz.</p>
+              <p role="alert" className="text-sm text-destructive">
+                Failed to load quiz. Please try again later.
+              </p>
             )}
           </div>
         </>
