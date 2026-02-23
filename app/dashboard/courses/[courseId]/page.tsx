@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "@/components/ui/toast";
+import { toast } from "sonner";
 import { CourseViewer } from "@/components/courses/course-viewer";
 import { GenerationStatus } from "@/components/courses/generation-status";
 import { Quiz } from "@/components/courses/quiz";
@@ -160,7 +160,10 @@ export default function CourseDetailPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-12">
       <nav aria-label="Breadcrumb" className="mb-6">
-        <Link href="/dashboard/courses" className="text-sm text-muted-foreground hover:underline">
+        <Link
+          href="/dashboard/courses"
+          className="text-sm text-muted-foreground hover:underline"
+        >
           ← Courses
         </Link>
       </nav>
