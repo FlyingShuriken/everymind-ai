@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { toast } from "@/components/ui/toast";
+import { toast } from "sonner";
 
 interface GenerationStatusProps {
   courseId: string;
@@ -41,7 +41,9 @@ export function GenerationStatus({
         pollFailures.current++;
         if (pollFailures.current >= 5) {
           clearInterval(interval);
-          toast.error("Lost connection while checking generation status. Please refresh the page.");
+          toast.error(
+            "Lost connection while checking generation status. Please refresh the page.",
+          );
           setError("Connection lost. Please refresh the page.");
         }
       }
@@ -71,7 +73,7 @@ export function GenerationStatus({
       {status === "DRAFT" && (
         <p className="text-sm text-muted-foreground">
           {isCreator
-            ? "Course is in draft. Click \"Generate\" to create content."
+            ? 'Course is in draft. Click "Generate" to create content.'
             : "This course is being prepared. Check back with the teacher once it\u2019s ready."}
         </p>
       )}
