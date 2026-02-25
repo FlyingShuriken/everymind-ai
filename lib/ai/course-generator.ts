@@ -262,7 +262,7 @@ Before finalizing, verify:
         ],
       },
     ],
-    config: { systemInstruction: systemPrompt },
+    config: { systemInstruction: systemPrompt, responseMimeType: "application/json" },
   });
 
   return parseAIJson<CourseOutline>(response.text!);
@@ -346,7 +346,7 @@ Before finalizing, verify:
         ],
       },
     ],
-    config: { systemInstruction: systemPrompt },
+    config: { systemInstruction: systemPrompt, responseMimeType: "application/json" },
   });
 
   return parseAIJson<SectionContent>(response.text!);

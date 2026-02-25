@@ -2,7 +2,13 @@ import { GoogleAuth } from "google-auth-library";
 import { storagePut } from "@/lib/storage";
 import { env } from "@/lib/env";
 
-const DISCOVERY_ENGINE_BASE = "https://discoveryengine.googleapis.com/v1alpha";
+// Location-prefixed endpoint per the NotebookLM Enterprise API spec.
+// GOOGLE_CLOUD_LOCATION should be "us", "eu", or "global" (default).
+const loc = env.GOOGLE_CLOUD_LOCATION; // e.g. "us" or "global"
+const proj = env.GOOGLE_CLOUD_PROJECT_NUMBER; // numeric project number required
+
+const BASE = `https://${loc}-discoveryengine.googleapis.com/v1alpha/projects/${proj}/locations/${loc}`;
+const UPLOAD_BASE = `https://${loc}-discoveryengine.googleapis.com/upload/v1alpha/projects/${proj}/locations/${loc}`;
 
 async function getAccessToken(): Promise<string> {
   const credPath = env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -10,6 +16,9 @@ async function getAccessToken(): Promise<string> {
 
   if (!project) {
     throw new Error("GOOGLE_CLOUD_PROJECT is required for NotebookLM Podcast API");
+  }
+  if (!proj) {
+    throw new Error("GOOGLE_CLOUD_PROJECT_NUMBER is required for NotebookLM Podcast API");
   }
   if (!credPath) {
     throw new Error("GOOGLE_APPLICATION_CREDENTIALS is required for NotebookLM Podcast API");
@@ -29,92 +38,104 @@ export async function generatePodcast(
   allSectionText: string,
   courseId: string,
 ): Promise<string> {
-  const project = env.GOOGLE_CLOUD_PROJECT;
-  if (!project) {
-    throw new Error("GOOGLE_CLOUD_PROJECT required for podcast generation");
-  }
-
   const token = await getAccessToken();
 
-  // Create a notebook and generate audio overview
-  const notebookPayload = {
-    displayName: courseTitle,
-    sources: [
-      {
-        inlineSource: {
-          content: allSectionText.slice(0, 100000), // max 100K chars
-          mimeType: "text/plain",
-        },
-      },
-    ],
-  };
-
-  // Create notebook
-  const createRes = await fetch(
-    `${DISCOVERY_ENGINE_BASE}/projects/${project}/locations/global/collections/default_collection/dataStores/-/notebooks`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(notebookPayload),
+  // Step 1: Create notebook
+  const createRes = await fetch(`${BASE}/notebooks`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify({ title: courseTitle }),
+  });
 
   if (!createRes.ok) {
     const err = await createRes.text();
     throw new Error(`NotebookLM create notebook failed: ${err}`);
   }
 
-  const notebook = (await createRes.json()) as { name: string };
-  const notebookName = notebook.name;
+  const notebook = (await createRes.json()) as { notebookId: string; name: string };
+  const notebookId = notebook.notebookId;
 
-  // Generate audio overview
-  const audioRes = await fetch(
-    `${DISCOVERY_ENGINE_BASE}/${notebookName}:generateAudioOverview`,
+  // Step 2: Upload the course text as a plain-text file source
+  const textBytes = Buffer.from(allSectionText.slice(0, 500_000), "utf-8");
+  const sourceRes = await fetch(
+    `${UPLOAD_BASE}/notebooks/${notebookId}/sources:uploadFile`,
     {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+        "Content-Type": "text/plain",
+        "X-Goog-Upload-Protocol": "raw",
+        "X-Goog-Upload-File-Name": "course.txt",
       },
-      body: JSON.stringify({}),
+      body: textBytes,
     },
   );
+
+  if (!sourceRes.ok) {
+    const err = await sourceRes.text();
+    throw new Error(`NotebookLM add source failed: ${err}`);
+  }
+
+  // Step 3: Request audio overview generation (empty body — API uses all sources with defaults)
+  const audioRes = await fetch(`${BASE}/notebooks/${notebookId}/audioOverviews`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({}),
+  });
 
   if (!audioRes.ok) {
     const err = await audioRes.text();
     throw new Error(`NotebookLM generate audio failed: ${err}`);
   }
 
-  // Poll for operation completion
-  const operation = (await audioRes.json()) as { name: string; done?: boolean; response?: { audioData?: string } };
-  const operationName = operation.name;
-
-  for (let attempt = 0; attempt < 60; attempt++) {
+  // Step 4: Poll audioOverviews/default until ready (up to 15 minutes)
+  const deadline = Date.now() + 15 * 60 * 1000;
+  while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 5000));
 
-    const pollRes = await fetch(
-      `${DISCOVERY_ENGINE_BASE}/${operationName}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      },
-    );
+    const pollRes = await fetch(`${BASE}/notebooks/${notebookId}/audioOverviews/default`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-    if (!pollRes.ok) continue;
+    if (!pollRes.ok) {
+      console.warn(`[notebooklm] Poll returned ${pollRes.status}: ${await pollRes.text()}`);
+      continue;
+    }
 
-    const op = (await pollRes.json()) as {
-      done?: boolean;
-      response?: { audioData?: string };
-      error?: { message: string };
+    const overview = (await pollRes.json()) as {
+      audioOverview?: {
+        status: string;
+        audioOverviewId?: string;
+      };
     };
 
-    if (op.done) {
-      if (op.error) throw new Error(`Podcast generation failed: ${op.error.message}`);
-      if (!op.response?.audioData) throw new Error("No audio data in podcast response");
+    const status = overview.audioOverview?.status;
+    console.log(`[notebooklm] Audio overview status: ${status}`, JSON.stringify(overview).slice(0, 300));
 
-      const buffer = Buffer.from(op.response.audioData, "base64");
+    if (status === "AUDIO_OVERVIEW_STATUS_FAILED") {
+      throw new Error("NotebookLM audio overview generation failed");
+    }
+
+    if (status === "AUDIO_OVERVIEW_STATUS_READY") {
+      // Step 5: Download the audio bytes
+      const dlRes = await fetch(`${BASE}/notebooks/${notebookId}/audioOverviews/default`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "audio/mpeg",
+        },
+      });
+
+      if (!dlRes.ok) {
+        throw new Error(`NotebookLM audio download failed: ${await dlRes.text()}`);
+      }
+
+      const buffer = Buffer.from(await dlRes.arrayBuffer());
       const stored = await storagePut(`podcast/${courseId}.mp3`, buffer, {
         contentType: "audio/mpeg",
       });
@@ -122,5 +143,5 @@ export async function generatePodcast(
     }
   }
 
-  throw new Error("NotebookLM podcast generation timed out after 5 minutes");
+  throw new Error("NotebookLM podcast generation timed out after 15 minutes");
 }

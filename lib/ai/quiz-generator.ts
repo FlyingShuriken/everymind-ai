@@ -47,6 +47,7 @@ Create 5-10 questions. Mix difficulty levels. Keep language clear and accessible
     config: {
       systemInstruction:
         "You create educational quiz questions at different cognitive levels: recall, comprehension, and application. Respond with ONLY valid JSON, no markdown fences, no extra text.",
+      responseMimeType: "application/json",
     },
   });
 

@@ -6,6 +6,7 @@ const envSchema = z.object({
   GOOGLE_GENAI_USE_VERTEXAI: z.string().optional().default("true"),
   GOOGLE_CLOUD_LOCATION: z.string().optional().default("global"),
   GOOGLE_CLOUD_PROJECT: z.string().optional(),
+  GOOGLE_CLOUD_PROJECT_NUMBER: z.string().optional(),
   GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
   BLOB_READ_WRITE_TOKEN: z.string().optional(),
   NEXT_PUBLIC_NODE_ENV: z

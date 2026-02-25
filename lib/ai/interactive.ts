@@ -81,6 +81,7 @@ Respond with ONLY valid JSON. No markdown fences, no preamble.`,
     config: {
       systemInstruction:
         "You create engaging educational exercises that test understanding at multiple cognitive levels. All exercises must be grounded in the provided section content.",
+      responseMimeType: "application/json",
     },
   });
 
