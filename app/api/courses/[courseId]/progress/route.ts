@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getUserByClerkId } from "@/lib/db/users";
+import { getProgressForCourse, upsertProgress } from "@/lib/db/user-progress";
 import { z } from "zod";
 
 const progressBodySchema = z.object({
@@ -20,14 +21,12 @@ export async function GET(
 
   const { courseId } = await params;
 
-  const user = await prisma.user.findUnique({ where: { clerkId } });
+  const user = await getUserByClerkId(clerkId);
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const rows = await prisma.userProgress.findMany({
-    where: { userId: user.id, courseId },
-  });
+  const rows = await getProgressForCourse(user.id, courseId);
 
   const progressMap: Record<
     string,
@@ -57,7 +56,7 @@ export async function POST(
 
   const { courseId } = await params;
 
-  const user = await prisma.user.findUnique({ where: { clerkId } });
+  const user = await getUserByClerkId(clerkId);
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
@@ -70,21 +69,9 @@ export async function POST(
 
   const { contentId, completed, timeSpent } = parsed.data;
 
-  await prisma.userProgress.upsert({
-    where: {
-      userId_courseId_contentId: { userId: user.id, courseId, contentId },
-    },
-    update: {
-      ...(completed !== undefined && { completed }),
-      ...(timeSpent !== undefined && { timeSpent }),
-    },
-    create: {
-      userId: user.id,
-      courseId,
-      contentId,
-      completed: completed ?? false,
-      timeSpent: timeSpent ?? 0,
-    },
+  await upsertProgress(user.id, courseId, contentId, {
+    completed,
+    timeSpent,
   });
 
   return NextResponse.json({ success: true });

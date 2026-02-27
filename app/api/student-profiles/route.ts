@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getUserByClerkId } from "@/lib/db/users";
+import { getStudentProfiles, createStudentProfile } from "@/lib/db/student-profiles";
 import { z } from "zod/v4";
 
 const studentProfileSchema = z.object({
@@ -24,13 +25,10 @@ export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const user = await prisma.user.findUnique({ where: { clerkId: userId } });
+  const user = await getUserByClerkId(userId);
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-  const profiles = await prisma.studentProfile.findMany({
-    where: { userId: user.id },
-    orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
-  });
+  const profiles = await getStudentProfiles(user.id);
 
   return NextResponse.json(profiles);
 }
@@ -39,7 +37,7 @@ export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const user = await prisma.user.findUnique({ where: { clerkId: userId } });
+  const user = await getUserByClerkId(userId);
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
   const body = await req.json();
@@ -48,19 +46,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { isDefault, ...data } = parsed.data;
-
-  // If this is the default, unset others
-  if (isDefault) {
-    await prisma.studentProfile.updateMany({
-      where: { userId: user.id },
-      data: { isDefault: false },
-    });
-  }
-
-  const profile = await prisma.studentProfile.create({
-    data: { ...data, userId: user.id, isDefault },
-  });
+  const profile = await createStudentProfile(user.id, parsed.data);
 
   return NextResponse.json(profile, { status: 201 });
 }

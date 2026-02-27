@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getUserByClerkId } from "@/lib/db/users";
+import { getCourseContent, updateCourseContent } from "@/lib/db/course-contents";
 import { generateSpeech } from "@/lib/ai/tts";
 
 export async function POST(
@@ -14,7 +15,7 @@ export async function POST(
 
   const { courseId } = await params;
 
-  const user = await prisma.user.findUnique({ where: { clerkId } });
+  const user = await getUserByClerkId(clerkId);
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
@@ -27,9 +28,7 @@ export async function POST(
     );
   }
 
-  const content = await prisma.courseContent.findFirst({
-    where: { id: contentId, courseId },
-  });
+  const content = await getCourseContent(courseId, contentId);
 
   if (!content) {
     return NextResponse.json({ error: "Content not found" }, { status: 404 });
@@ -63,11 +62,8 @@ export async function POST(
   const audioUrl = await generateSpeech(plainText, content.id);
 
   // Cache audio URL in metadata
-  await prisma.courseContent.update({
-    where: { id: content.id },
-    data: {
-      metadata: JSON.stringify({ ...metadata, audioUrl }),
-    },
+  await updateCourseContent(courseId, content.id, {
+    metadata: JSON.stringify({ ...metadata, audioUrl }),
   });
 
   return NextResponse.json({ audioUrl });

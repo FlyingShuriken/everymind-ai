@@ -1,6 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getUserByClerkId } from "@/lib/db/users";
+import { getCourse, deleteCourse } from "@/lib/db/courses";
+import { getCourseContents } from "@/lib/db/course-contents";
 
 export async function GET(
   _request: Request,
@@ -13,21 +15,20 @@ export async function GET(
 
   const { courseId } = await params;
 
-  const user = await prisma.user.findUnique({ where: { clerkId } });
+  const user = await getUserByClerkId(clerkId);
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const course = await prisma.course.findFirst({
-    where: { id: courseId },
-    include: { contents: { orderBy: { orderIndex: "asc" } } },
-  });
+  const course = await getCourse(courseId);
 
   if (!course) {
     return NextResponse.json({ error: "Course not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ ...course, isCreator: course.creatorId === user.id });
+  const contents = await getCourseContents(courseId);
+
+  return NextResponse.json({ ...course, contents, isCreator: course.creatorId === user.id });
 }
 
 export async function DELETE(
@@ -41,20 +42,18 @@ export async function DELETE(
 
   const { courseId } = await params;
 
-  const user = await prisma.user.findUnique({ where: { clerkId } });
+  const user = await getUserByClerkId(clerkId);
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const course = await prisma.course.findFirst({
-    where: { id: courseId, creatorId: user.id },
-  });
+  const course = await getCourse(courseId);
 
-  if (!course) {
+  if (!course || course.creatorId !== user.id) {
     return NextResponse.json({ error: "Course not found" }, { status: 404 });
   }
 
-  await prisma.course.delete({ where: { id: courseId } });
+  await deleteCourse(courseId);
 
   return NextResponse.json({ success: true });
 }

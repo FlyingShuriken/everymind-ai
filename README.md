@@ -118,9 +118,10 @@ Course ready: Text + Audio + selected modes
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 15, React 19, TypeScript, Tailwind CSS 4, shadcn/ui |
+| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4, shadcn/ui |
 | Backend | Next.js API Routes (single codebase) |
-| Database | PostgreSQL (Supabase) via Prisma 7 |
+| Database | Firebase Firestore (Admin SDK, server-side only) |
+| File Storage | Firebase Cloud Storage |
 | Authentication | Clerk |
 | AI (Text, Quiz, Interactive) | Gemini 3 Flash Preview via `@google/genai` |
 | AI (Audio Narration) | Gemini 2.5 Flash TTS |
@@ -128,7 +129,6 @@ Course ready: Text + Audio + selected modes
 | AI (Images) | Imagen 4.0 Fast |
 | AI (Video) | Veo 3.1 Fast |
 | Document Extraction | Gemini vision (PDF screenshots) + mammoth (DOCX) |
-| File Storage | Vercel Blob (production) / local filesystem (development) |
 | Deployment | Vercel |
 
 ### Accessibility Stack
@@ -173,10 +173,7 @@ pnpm install
 
 # Set up environment variables
 cp .env.example .env.local
-# Fill in: DATABASE_URL, GOOGLE_API_KEY, Clerk keys
-
-# Run database migrations
-pnpm prisma migrate dev
+# Fill in: FIREBASE_SERVICE_ACCOUNT_KEY, FIREBASE_STORAGE_BUCKET, GOOGLE_API_KEY, Clerk keys
 
 # Start development server
 pnpm dev

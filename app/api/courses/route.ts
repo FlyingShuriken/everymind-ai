@@ -1,6 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getUserByClerkId } from "@/lib/db/users";
+import { getCoursesByCreator, createCourse } from "@/lib/db/courses";
+import { getStudentProfileByIdAndUser } from "@/lib/db/student-profiles";
 import { createCourseSchema } from "@/lib/validators";
 
 export async function GET() {
@@ -9,15 +11,12 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const user = await prisma.user.findUnique({ where: { clerkId } });
+  const user = await getUserByClerkId(clerkId);
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const courses = await prisma.course.findMany({
-    where: { creatorId: user.id },
-    orderBy: { createdAt: "desc" },
-  });
+  const courses = await getCoursesByCreator(user.id);
 
   return NextResponse.json(courses);
 }
@@ -28,7 +27,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const user = await prisma.user.findUnique({ where: { clerkId } });
+  const user = await getUserByClerkId(clerkId);
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
@@ -46,25 +45,21 @@ export async function POST(request: Request) {
 
   // Validate profile belongs to user if provided
   if (studentProfileId) {
-    const profile = await prisma.studentProfile.findFirst({
-      where: { id: studentProfileId, userId: user.id },
-    });
+    const profile = await getStudentProfileByIdAndUser(studentProfileId, user.id);
     if (!profile) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
   }
 
-  const course = await prisma.course.create({
-    data: {
-      title,
-      creatorId: user.id,
-      studentProfileId: studentProfileId ?? null,
-      sourceMaterials: JSON.stringify(
-        sourceType === "upload"
-          ? (fileUrls ?? []).map((url) => ({ type: "file", url }))
-          : [{ type: "topic", text: topic }],
-      ),
-    },
+  const course = await createCourse({
+    title,
+    creatorId: user.id,
+    studentProfileId: studentProfileId ?? null,
+    sourceMaterials: JSON.stringify(
+      sourceType === "upload"
+        ? (fileUrls ?? []).map((url) => ({ type: "file", url }))
+        : [{ type: "topic", text: topic }],
+    ),
   });
 
   return NextResponse.json(course, { status: 201 });

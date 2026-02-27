@@ -1,7 +1,7 @@
 import { Webhook } from "svix";
 import { headers } from "next/headers";
 import { WebhookEvent } from "@clerk/nextjs/server";
-import { prisma } from "@/lib/prisma";
+import { upsertUserByClerkId, getUserByClerkId, deleteUserCascade } from "@/lib/db/users";
 
 export async function POST(req: Request) {
   const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
@@ -41,17 +41,19 @@ export async function POST(req: Request) {
 
     const name = [first_name, last_name].filter(Boolean).join(" ") || null;
 
-    await prisma.user.upsert({
-      where: { clerkId: id },
+    await upsertUserByClerkId(id, {
+      create: { email, name },
       update: { email, name },
-      create: { clerkId: id, email, name },
     });
   }
 
   if (evt.type === "user.deleted") {
     const { id } = evt.data;
     if (id) {
-      await prisma.user.deleteMany({ where: { clerkId: id } });
+      const user = await getUserByClerkId(id);
+      if (user) {
+        await deleteUserCascade(user.id);
+      }
     }
   }
 

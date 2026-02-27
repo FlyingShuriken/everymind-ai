@@ -1,6 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getUserByClerkId } from "@/lib/db/users";
+import { getCourse } from "@/lib/db/courses";
+import { getCourseContentByType, getCourseContentsByType, createCourseContent } from "@/lib/db/course-contents";
+import { upsertProgress } from "@/lib/db/user-progress";
 import { generateQuiz } from "@/lib/ai/quiz-generator";
 import { quizSubmissionSchema } from "@/lib/validators";
 
@@ -15,14 +18,12 @@ export async function GET(
 
   const { courseId } = await params;
 
-  const user = await prisma.user.findUnique({ where: { clerkId } });
+  const user = await getUserByClerkId(clerkId);
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const course = await prisma.course.findFirst({
-    where: { id: courseId },
-  });
+  const course = await getCourse(courseId);
 
   if (!course || course.status !== "READY") {
     return NextResponse.json(
@@ -32,19 +33,14 @@ export async function GET(
   }
 
   // Check for existing quiz
-  const existingQuiz = await prisma.courseContent.findFirst({
-    where: { courseId, contentType: "QUIZ" },
-  });
+  const existingQuiz = await getCourseContentByType(courseId, "QUIZ");
 
   if (existingQuiz) {
     return NextResponse.json(JSON.parse(existingQuiz.contentData as string));
   }
 
   // Generate quiz from section summaries
-  const sections = await prisma.courseContent.findMany({
-    where: { courseId, contentType: "TEXT" },
-    orderBy: { orderIndex: "asc" },
-  });
+  const sections = await getCourseContentsByType(courseId, "TEXT");
 
   const summaries = sections.map((s) => {
     const data = JSON.parse(s.contentData as string);
@@ -54,13 +50,10 @@ export async function GET(
   const quiz = await generateQuiz(course.title, summaries);
 
   // Cache as CourseContent
-  await prisma.courseContent.create({
-    data: {
-      courseId,
-      contentType: "QUIZ",
-      contentData: JSON.stringify(quiz),
-      orderIndex: 999,
-    },
+  await createCourseContent(courseId, {
+    contentType: "QUIZ",
+    contentData: JSON.stringify(quiz),
+    orderIndex: 999,
   });
 
   return NextResponse.json(quiz);
@@ -77,7 +70,7 @@ export async function POST(
 
   const { courseId } = await params;
 
-  const user = await prisma.user.findUnique({ where: { clerkId } });
+  const user = await getUserByClerkId(clerkId);
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
@@ -92,9 +85,7 @@ export async function POST(
   }
 
   // Get quiz content
-  const quizContent = await prisma.courseContent.findFirst({
-    where: { courseId, contentType: "QUIZ" },
-  });
+  const quizContent = await getCourseContentByType(courseId, "QUIZ");
 
   if (!quizContent) {
     return NextResponse.json({ error: "Quiz not found" }, { status: 404 });
@@ -119,25 +110,9 @@ export async function POST(
   const score = quiz.questions.length > 0 ? correct / quiz.questions.length : 0;
 
   // Save progress
-  await prisma.userProgress.upsert({
-    where: {
-      userId_courseId_contentId: {
-        userId: user.id,
-        courseId,
-        contentId: quizContent.id,
-      },
-    },
-    update: {
-      completed: true,
-      performanceData: JSON.stringify({ score, correct, total: quiz.questions.length, results }),
-    },
-    create: {
-      userId: user.id,
-      courseId,
-      contentId: quizContent.id,
-      completed: true,
-      performanceData: JSON.stringify({ score, correct, total: quiz.questions.length, results }),
-    },
+  await upsertProgress(user.id, courseId, quizContent.id, {
+    completed: true,
+    performanceData: JSON.stringify({ score, correct, total: quiz.questions.length, results }),
   });
 
   return NextResponse.json({ score, correct, total: quiz.questions.length, results });

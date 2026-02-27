@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { getUserByClerkId } from "@/lib/db/users";
+import { getLearningProfile } from "@/lib/db/learning-profiles";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -8,16 +9,18 @@ export default async function DashboardPage() {
   const { userId: clerkId } = await auth();
   if (!clerkId) redirect("/sign-in");
 
-  const user = await prisma.user.findUnique({
-    where: { clerkId },
-    include: { learningProfile: true },
-  });
+  const user = await getUserByClerkId(clerkId);
 
-  if (!user?.learningProfile?.completedAt) {
+  if (!user) {
     redirect("/onboarding");
   }
 
-  const profile = user.learningProfile;
+  const profile = await getLearningProfile(user.id);
+
+  if (!profile?.completedAt) {
+    redirect("/onboarding");
+  }
+
   const disabilities = profile.disabilities as string[];
   const preferences = profile.preferences as string[];
   const a11y = profile.accessibilityNeeds as Record<string, unknown>;

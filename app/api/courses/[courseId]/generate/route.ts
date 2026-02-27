@@ -1,6 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getUserByClerkId } from "@/lib/db/users";
+import { getCourse, updateCourse } from "@/lib/db/courses";
+import { createCourseContent, updateCourseContent } from "@/lib/db/course-contents";
+import { getStudentProfile } from "@/lib/db/student-profiles";
 import { generateCourse, type CourseInput, withConcurrency } from "@/lib/ai/course-generator";
 import { generateQuiz } from "@/lib/ai/quiz-generator";
 import { generateSpeech } from "@/lib/ai/tts";
@@ -22,17 +25,14 @@ export async function POST(
 
   const { courseId } = await params;
 
-  const user = await prisma.user.findUnique({ where: { clerkId } });
+  const user = await getUserByClerkId(clerkId);
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const course = await prisma.course.findFirst({
-    where: { id: courseId, creatorId: user.id },
-    include: { studentProfile: true },
-  });
+  const course = await getCourse(courseId);
 
-  if (!course) {
+  if (!course || course.creatorId !== user.id) {
     return NextResponse.json({ error: "Course not found" }, { status: 404 });
   }
 
@@ -43,10 +43,11 @@ export async function POST(
     );
   }
 
-  await prisma.course.update({
-    where: { id: courseId },
-    data: { status: "PROCESSING" },
-  });
+  const studentProfile = course.studentProfileId
+    ? await getStudentProfile(course.studentProfileId)
+    : null;
+
+  await updateCourse(courseId, { status: "PROCESSING" });
 
   try {
     const sources = JSON.parse(
@@ -86,11 +87,11 @@ export async function POST(
     const input: CourseInput = {
       filePdfs: filePdfs.length ? filePdfs : undefined,
       text: textParts.length ? textParts.join("\n\n") : undefined,
-      studentProfile: course.studentProfile
+      studentProfile: studentProfile
         ? {
-            disabilities: course.studentProfile.disabilities as string[],
-            preferences: course.studentProfile.preferences as string[],
-            accessibilityNeeds: course.studentProfile.accessibilityNeeds as {
+            disabilities: studentProfile.disabilities as string[],
+            preferences: studentProfile.preferences as string[],
+            accessibilityNeeds: studentProfile.accessibilityNeeds as {
               fontSize: string;
               highContrast: boolean;
               reducedMotion: boolean;
@@ -106,27 +107,21 @@ export async function POST(
 
     const { outline, sections } = await generateCourse(input);
 
-    await prisma.course.update({
-      where: { id: courseId },
-      data: {
-        title: outline.title,
-        description: outline.description,
-      },
+    await updateCourse(courseId, {
+      title: outline.title,
+      description: outline.description,
     });
 
     // Save text sections and collect their IDs
     const textContentIds: string[] = [];
     for (let i = 0; i < sections.length; i++) {
-      const content = await prisma.courseContent.create({
-        data: {
-          courseId,
-          contentType: "TEXT",
-          contentData: JSON.stringify(sections[i]),
-          metadata: JSON.stringify({
-            outlineSection: outline.sections[i],
-          }),
-          orderIndex: i,
-        },
+      const content = await createCourseContent(courseId, {
+        contentType: "TEXT",
+        contentData: JSON.stringify(sections[i]),
+        metadata: JSON.stringify({
+          outlineSection: outline.sections[i],
+        }),
+        orderIndex: i,
       });
       textContentIds.push(content.id);
     }
@@ -138,14 +133,11 @@ export async function POST(
           outline.title,
           sections.map((s) => s.summary),
         );
-        await prisma.courseContent.create({
-          data: {
-            courseId,
-            contentType: "QUIZ",
-            contentData: JSON.stringify(quiz),
-            metadata: JSON.stringify({}),
-            orderIndex: sections.length,
-          },
+        await createCourseContent(courseId, {
+          contentType: "QUIZ",
+          contentData: JSON.stringify(quiz),
+          metadata: JSON.stringify({}),
+          orderIndex: sections.length,
         });
       } catch (err) {
         console.error("[generate] Quiz generation failed:", err);
@@ -161,14 +153,11 @@ export async function POST(
               `${section.title}. ${section.body}`,
               textContentIds[i],
             );
-            await prisma.courseContent.update({
-              where: { id: textContentIds[i] },
-              data: {
-                metadata: JSON.stringify({
-                  outlineSection: outline.sections[i],
-                  audioUrl,
-                }),
-              },
+            await updateCourseContent(courseId, textContentIds[i], {
+              metadata: JSON.stringify({
+                outlineSection: outline.sections[i],
+                audioUrl,
+              }),
             });
           } catch (err) {
             console.error(`[generate] TTS failed for section ${i}:`, err);
@@ -178,7 +167,7 @@ export async function POST(
       );
     };
 
-    const outputModes = ((course.studentProfile?.outputModes ?? []) as string[]);
+    const outputModes = ((studentProfile?.outputModes ?? []) as string[]);
 
     // Podcast generation (NotebookLM)
     const podcastTask = async () => {
@@ -188,14 +177,11 @@ export async function POST(
           .map((s, i) => `## ${outline.sections[i].title}\n\n${s.body}`)
           .join("\n\n---\n\n");
         const podcastUrl = await generatePodcast(outline.title, allText, courseId);
-        await prisma.courseContent.create({
-          data: {
-            courseId,
-            contentType: "PODCAST",
-            contentData: JSON.stringify({ podcastUrl, courseTitle: outline.title }),
-            metadata: JSON.stringify({}),
-            orderIndex: 0,
-          },
+        await createCourseContent(courseId, {
+          contentType: "PODCAST",
+          contentData: JSON.stringify({ podcastUrl, courseTitle: outline.title }),
+          metadata: JSON.stringify({}),
+          orderIndex: 0,
         });
       } catch (err) {
         console.error("[generate] Podcast generation failed:", err);
@@ -215,14 +201,11 @@ export async function POST(
               i,
             );
             if (images.length > 0) {
-              await prisma.courseContent.create({
-                data: {
-                  courseId,
-                  contentType: "VISUAL",
-                  contentData: JSON.stringify({ images, sectionTitle: section.title }),
-                  metadata: JSON.stringify({ sectionIndex: i }),
-                  orderIndex: i,
-                },
+              await createCourseContent(courseId, {
+                contentType: "VISUAL",
+                contentData: JSON.stringify({ images, sectionTitle: section.title }),
+                metadata: JSON.stringify({ sectionIndex: i }),
+                orderIndex: i,
               });
             }
           } catch (err) {
@@ -245,14 +228,11 @@ export async function POST(
               outline.title,
               i,
             );
-            await prisma.courseContent.create({
-              data: {
-                courseId,
-                contentType: "VIDEO",
-                contentData: JSON.stringify({ videoUrl, sectionTitle: section.title }),
-                metadata: JSON.stringify({ sectionIndex: i }),
-                orderIndex: i,
-              },
+            await createCourseContent(courseId, {
+              contentType: "VIDEO",
+              contentData: JSON.stringify({ videoUrl, sectionTitle: section.title }),
+              metadata: JSON.stringify({ sectionIndex: i }),
+              orderIndex: i,
             });
           } catch (err) {
             console.error(`[generate] Video generation failed for section ${i}:`, err);
@@ -273,14 +253,11 @@ export async function POST(
               section.body,
               section.summary,
             );
-            await prisma.courseContent.create({
-              data: {
-                courseId,
-                contentType: "INTERACTIVE",
-                contentData: JSON.stringify(exercises),
-                metadata: JSON.stringify({ sectionIndex: i }),
-                orderIndex: i,
-              },
+            await createCourseContent(courseId, {
+              contentType: "INTERACTIVE",
+              contentData: JSON.stringify(exercises),
+              metadata: JSON.stringify({ sectionIndex: i }),
+              orderIndex: i,
             });
           } catch (err) {
             console.error(`[generate] Interactive generation failed for section ${i}:`, err);
@@ -300,19 +277,13 @@ export async function POST(
       interactiveTask(),
     ]);
 
-    await prisma.course.update({
-      where: { id: courseId },
-      data: { status: "READY" },
-    });
+    await updateCourse(courseId, { status: "READY" });
 
     return NextResponse.json({ status: "READY" });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Generation failed";
-    await prisma.course.update({
-      where: { id: courseId },
-      data: { status: "ERROR", generationError: message },
-    });
+    await updateCourse(courseId, { status: "ERROR", generationError: message });
 
     return NextResponse.json({ error: message }, { status: 500 });
   }

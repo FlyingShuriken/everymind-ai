@@ -1,7 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { getUserByClerkId } from "@/lib/db/users";
+import { getCoursesByCreator } from "@/lib/db/courses";
 import { Button } from "@/components/ui/button";
 import { CourseCard } from "@/components/courses/course-card";
 
@@ -9,13 +10,10 @@ export default async function CoursesPage() {
   const { userId: clerkId } = await auth();
   if (!clerkId) redirect("/sign-in");
 
-  const user = await prisma.user.findUnique({ where: { clerkId } });
+  const user = await getUserByClerkId(clerkId);
   if (!user) redirect("/sign-in");
 
-  const courses = await prisma.course.findMany({
-    where: { creatorId: user.id },
-    orderBy: { createdAt: "desc" },
-  });
+  const courses = await getCoursesByCreator(user.id);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-12">

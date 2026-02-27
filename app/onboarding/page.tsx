@@ -1,19 +1,20 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { getUserByClerkId } from "@/lib/db/users";
+import { getLearningProfile } from "@/lib/db/learning-profiles";
 import { AssessmentWizard } from "@/components/onboarding/assessment-wizard";
 
 export default async function OnboardingPage() {
   const { userId: clerkId } = await auth();
   if (!clerkId) redirect("/sign-in");
 
-  const user = await prisma.user.findUnique({
-    where: { clerkId },
-    include: { learningProfile: true },
-  });
+  const user = await getUserByClerkId(clerkId);
 
-  if (user?.learningProfile?.completedAt) {
-    redirect("/dashboard");
+  if (user) {
+    const learningProfile = await getLearningProfile(user.id);
+    if (learningProfile?.completedAt) {
+      redirect("/dashboard");
+    }
   }
 
   return (

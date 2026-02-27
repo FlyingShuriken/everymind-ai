@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getUserByClerkId } from "@/lib/db/users";
+import { getStudentProfileByIdAndUser, updateStudentProfile, deleteStudentProfile } from "@/lib/db/student-profiles";
 import { z } from "zod/v4";
 
 const updateSchema = z.object({
@@ -20,37 +21,21 @@ const updateSchema = z.object({
   isDefault: z.boolean().optional(),
 });
 
-async function getProfile(profileId: string, clerkId: string) {
-  const user = await prisma.user.findUnique({ where: { clerkId } });
-  if (!user) return null;
-  return prisma.studentProfile.findFirst({ where: { id: profileId, userId: user.id } });
-}
-
 export async function PATCH(req: Request, { params }: { params: Promise<{ profileId: string }> }) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { profileId } = await params;
-  const profile = await getProfile(profileId, userId);
-  if (!profile) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const user = await getUserByClerkId(userId);
+  if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const { isDefault, ...data } = parsed.data;
-
-  if (isDefault) {
-    await prisma.studentProfile.updateMany({
-      where: { userId: profile.userId },
-      data: { isDefault: false },
-    });
-  }
-
-  const updated = await prisma.studentProfile.update({
-    where: { id: profileId },
-    data: { ...data, ...(isDefault !== undefined ? { isDefault } : {}) },
-  });
+  const updated = await updateStudentProfile(profileId, user.id, parsed.data);
+  if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   return NextResponse.json(updated);
 }
@@ -60,9 +45,13 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ prof
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { profileId } = await params;
-  const profile = await getProfile(profileId, userId);
+
+  const user = await getUserByClerkId(userId);
+  if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const profile = await getStudentProfileByIdAndUser(profileId, user.id);
   if (!profile) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await prisma.studentProfile.delete({ where: { id: profileId } });
+  await deleteStudentProfile(profileId);
   return new NextResponse(null, { status: 204 });
 }
