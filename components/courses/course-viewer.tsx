@@ -5,7 +5,6 @@ import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { AudioPlayer } from "./audio-player";
-import { PodcastPlayer } from "./podcast-player";
 import { VisualGallery } from "./visual-gallery";
 import { VideoPlayer } from "./video-player";
 import { InteractiveExercises } from "./interactive-exercises";
@@ -31,11 +30,10 @@ interface CourseViewerProps {
   onSectionComplete?: (contentId: string) => void;
 }
 
-type Tab = "text" | "podcast" | "visual" | "video" | "interactive";
+type Tab = "text" | "visual" | "video" | "interactive";
 
 const TAB_LABELS: Record<Tab, string> = {
   text: "Text",
-  podcast: "Podcast",
   visual: "Visual",
   video: "Video",
   interactive: "Interactive",
@@ -57,13 +55,11 @@ export function CourseViewer({
   onSectionComplete,
 }: CourseViewerProps) {
   const textSections = contents.filter((c) => c.contentType === "TEXT");
-  const podcastContent = contents.find((c) => c.contentType === "PODCAST");
   const visualContents = contents.filter((c) => c.contentType === "VISUAL");
   const videoContents = contents.filter((c) => c.contentType === "VIDEO");
   const interactiveContents = contents.filter((c) => c.contentType === "INTERACTIVE");
 
   const availableTabs: Tab[] = ["text"];
-  if (podcastContent) availableTabs.push("podcast");
   if (visualContents.length > 0) availableTabs.push("visual");
   if (videoContents.length > 0) availableTabs.push("video");
   if (interactiveContents.length > 0) availableTabs.push("interactive");
@@ -184,29 +180,6 @@ export function CourseViewer({
           })}
         </div>
       </div>
-
-      {/* Podcast tab */}
-      {podcastContent && (
-        <div
-          id="tab-panel-podcast"
-          role="tabpanel"
-          aria-label="Podcast content"
-          hidden={activeTab !== "podcast"}
-        >
-          {(() => {
-            const data = JSON.parse(podcastContent.contentData) as {
-              podcastUrl: string;
-              courseTitle: string;
-            };
-            return (
-              <PodcastPlayer
-                podcastUrl={data.podcastUrl}
-                courseTitle={data.courseTitle}
-              />
-            );
-          })()}
-        </div>
-      )}
 
       {/* Visual tab */}
       {visualContents.length > 0 && (

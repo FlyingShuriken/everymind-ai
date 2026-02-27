@@ -4,10 +4,9 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DISABILITY_OPTIONS, PREFERENCE_OPTIONS, FONT_SIZE_OPTIONS } from "@/lib/constants";
 
-type OutputMode = "audio" | "visual" | "video" | "interactive";
+type OutputMode = "visual" | "video" | "interactive";
 
 const OUTPUT_MODE_OPTIONS: { value: OutputMode; label: string; description: string }[] = [
-  { value: "audio", label: "Audio (Podcast)", description: "Full conversational AI podcast of the course" },
   { value: "visual", label: "Visual", description: "AI-generated illustrations for each section" },
   { value: "video", label: "Video", description: "Short explainer videos per section" },
   { value: "interactive", label: "Interactive", description: "Embedded exercises and activities" },

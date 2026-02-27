@@ -21,7 +21,7 @@ EveryMind.ai is an end-to-end platform that:
 3. **Generates** personalized courses automatically in multiple formats
 4. **Delivers** content in the format that works best for each student
 
-The same material becomes a structured text course, audio narration, a conversational podcast, visual illustrations, short video explainers, and interactive exercises — all generated automatically and tailored to the student's profile.
+The same material becomes a structured text course, audio narration, visual illustrations, short video explainers, and interactive exercises — all generated automatically and tailored to the student's profile.
 
 ---
 
@@ -104,7 +104,7 @@ AI expands each section into full markdown content (adapted to student profile)
 In parallel:
   +-- Quiz generation (5-10 questions)
   +-- TTS audio narration (per section, always)
-  +-- Podcast generation (NotebookLM, if outputMode="audio")
+  +-- Podcast generation (NotebookLM) [disabled — API not yet stable]
   +-- Image generation (Imagen 4.0 Fast, if outputMode="visual")
   +-- Video generation (Veo 3.1 Fast, if outputMode="video")
   +-- Interactive exercises (fill-in-blank, MCQ, short answer, if outputMode="interactive")
@@ -125,7 +125,7 @@ Course ready: Text + Audio + selected modes
 | Authentication | Clerk |
 | AI (Text, Quiz, Interactive) | Gemini 3 Flash Preview via `@google/genai` |
 | AI (Audio Narration) | Gemini 2.5 Flash TTS |
-| AI (Podcast) | NotebookLM Podcast API |
+| AI (Podcast) | NotebookLM Podcast API [disabled] |
 | AI (Images) | Imagen 4.0 Fast |
 | AI (Video) | Veo 3.1 Fast |
 | Document Extraction | Gemini vision (PDF screenshots) + mammoth (DOCX) |

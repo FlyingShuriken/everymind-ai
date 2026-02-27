@@ -8,7 +8,6 @@ import { generateCourse, type CourseInput, withConcurrency } from "@/lib/ai/cour
 import { generateQuiz } from "@/lib/ai/quiz-generator";
 import { generateSpeech } from "@/lib/ai/tts";
 import { generateSectionImages } from "@/lib/ai/imagen";
-import { generatePodcast } from "@/lib/ai/notebooklm";
 import { generateSectionVideo } from "@/lib/ai/veo";
 import { generateInteractiveExercises } from "@/lib/ai/interactive";
 import { extractContent, extractPageChunks } from "@/lib/documents/extract";
@@ -169,25 +168,6 @@ export async function POST(
 
     const outputModes = ((studentProfile?.outputModes ?? []) as string[]);
 
-    // Podcast generation (NotebookLM)
-    const podcastTask = async () => {
-      if (!outputModes.includes("audio")) return;
-      try {
-        const allText = sections
-          .map((s, i) => `## ${outline.sections[i].title}\n\n${s.body}`)
-          .join("\n\n---\n\n");
-        const podcastUrl = await generatePodcast(outline.title, allText, courseId);
-        await createCourseContent(courseId, {
-          contentType: "PODCAST",
-          contentData: JSON.stringify({ podcastUrl, courseTitle: outline.title }),
-          metadata: JSON.stringify({}),
-          orderIndex: 0,
-        });
-      } catch (err) {
-        console.error("[generate] Podcast generation failed:", err);
-      }
-    };
-
     // Visual generation (Imagen 3)
     const visualTask = async () => {
       if (!outputModes.includes("visual")) return;
@@ -271,7 +251,6 @@ export async function POST(
     await Promise.allSettled([
       quizTask(),
       ttsTask(),
-      podcastTask(),
       visualTask(),
       videoTask(),
       interactiveTask(),
