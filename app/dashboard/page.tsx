@@ -29,7 +29,8 @@ export default async function DashboardPage() {
   const profile = await getLearningProfile(user.id);
   if (!profile?.completedAt) redirect("/onboarding");
 
-  const courses = await getCoursesByCreator(user.id).catch(() => []);
+  const allCourses = await getCoursesByCreator(user.id).catch(() => []);
+  const courses = allCourses.filter((c) => c.status !== "ERROR");
   const recentCourses = courses.slice(0, 3);
   const continueCourse = courses.find((c) => c.status === "READY") ?? null;
 

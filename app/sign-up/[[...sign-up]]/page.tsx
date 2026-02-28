@@ -9,7 +9,7 @@ export default function SignUpPage() {
           href="/"
           className="text-lg font-bold tracking-[-0.5px] text-[#1A1918]"
         >
-          everymind
+          EveryMind
         </Link>
       </div>
       <div className="flex flex-1 items-center justify-center px-4 pb-16">

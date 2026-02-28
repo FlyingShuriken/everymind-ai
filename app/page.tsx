@@ -10,7 +10,7 @@ export default function HomePage() {
           href="/"
           className="text-xl font-bold tracking-[-0.5px] text-[#1A1918]"
         >
-          everymind
+          EveryMind
         </Link>
 
         <div className="flex items-center gap-10">
@@ -63,7 +63,10 @@ export default function HomePage() {
       </nav>
 
       {/* Hero */}
-      <section className="flex flex-col items-center justify-center bg-[#F5F4F1] px-8 pb-16 pt-20 text-center" style={{ minHeight: "560px" }}>
+      <section
+        className="flex flex-col items-center justify-center bg-[#F5F4F1] px-8 pb-16 pt-20 text-center"
+        style={{ minHeight: "560px" }}
+      >
         <div className="mb-6 flex items-center rounded-full bg-[#C8F0D8] px-4 py-1.5">
           <span className="text-xs font-semibold text-[#3D8A5A]">
             AI-powered adaptive learning
@@ -96,10 +99,7 @@ export default function HomePage() {
       </section>
 
       {/* How it works */}
-      <section
-        id="how-it-works"
-        className="bg-white px-40 py-16"
-      >
+      <section id="how-it-works" className="bg-white px-40 py-16">
         <h2 className="mb-12 text-[28px] font-bold text-[#1A1918]">
           How EveryMind works
         </h2>
@@ -139,21 +139,20 @@ export default function HomePage() {
       </section>
 
       {/* For Teachers section */}
-      <section
-        id="teachers"
-        className="bg-[#F5F4F1] px-40 py-16"
-      >
+      <section id="teachers" className="bg-[#F5F4F1] px-40 py-16">
         <div className="max-w-lg">
           <div className="mb-4 inline-flex items-center rounded-full bg-[#C8F0D8] px-4 py-1.5">
-            <span className="text-xs font-semibold text-[#3D8A5A]">For educators</span>
+            <span className="text-xs font-semibold text-[#3D8A5A]">
+              For educators
+            </span>
           </div>
           <h2 className="mb-4 text-[28px] font-bold text-[#1A1918]">
             Built for teachers too
           </h2>
           <p className="mb-8 text-base leading-relaxed text-[#6D6C6A]">
-            Create student profiles with specific accessibility needs, then generate
-            courses tailored to each group. Every student gets content designed
-            for how they learn best.
+            Create student profiles with specific accessibility needs, then
+            generate courses tailored to each group. Every student gets content
+            designed for how they learn best.
           </p>
           <Link
             href="/sign-up"

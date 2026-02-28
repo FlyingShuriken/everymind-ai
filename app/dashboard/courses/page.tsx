@@ -12,7 +12,7 @@ export default async function CoursesPage() {
   const user = await getUserByClerkId(clerkId);
   if (!user) redirect("/sign-in");
 
-  const courses = await getCoursesByCreator(user.id);
+  const courses = (await getCoursesByCreator(user.id)).filter((c) => c.status !== "ERROR");
 
   return (
     <div className="px-14 py-12">
