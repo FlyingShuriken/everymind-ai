@@ -214,7 +214,7 @@ EveryMind.ai is built entirely on Google's ecosystem. **Vertex AI** serves as th
 
 **Problem:** The first iteration produced plain text with basic TTS narration. Feedback from r/ADHD and r/Dyslexia communities was consistent: robotic monotone narration of dense paragraphs failed to hold attention.
 
-**Solution:** Integrated the NotebookLM Podcast API for conversational two-voice podcasts. Added Veo video generation and Imagen illustrations after users confirmed visual explainers significantly improved retention.
+**Solution:** Added Veo video generation and Imagen illustrations after users confirmed visual explainers significantly improved retention.
 
 **Result:** The platform grew from a text + audio tool into a five-format multimodal platform driven directly by user feedback.
 
@@ -233,34 +233,6 @@ EveryMind.ai is built entirely on Google's ecosystem. **Vertex AI** serves as th
 **Solution:** Implemented WCAG 2.2-compliant features: full keyboard navigation, ARIA labels, semantic HTML structure, screen reader compatibility (VoiceOver, NVDA), and high contrast mode support.
 
 **Result:** EveryMind.ai operates with built-in OS and browser accessibility tools by default.
-
----
-
-## Future Roadmap
-
-### Short-term (0–6 months)
-
-- Complete WCAG 2.2 compliance audit: VoiceOver, NVDA, and keyboard navigation testing; colour contrast audit
-- Deploy to production on Vercel with monitoring, error tracking, and Firebase Analytics
-- Pilot with 2–3 schools targeting students with disabilities
-- Implement teacher analytics: per-student quiz scores and completion rates
-- Re-enable NotebookLM podcast generation
-
-### Medium-term (6–12 months)
-
-- **LMS integration:** Canvas, Moodle, and Google Classroom via LTI standard
-- **Multi-language support:** Gemini's multilingual capabilities for non-English-speaking students globally
-- **Shared course marketplace:** Teachers contribute accessible courses across institutions
-- **Batch upload:** Multiple files in a single course generation request
-
-### Long-term (12+ months)
-
-- **Ministry of Education partnerships:** Standard accessible content generation platform for public schools
-- **Native iOS and Android apps:** For mobile-first learners
-- **Government disability support schemes:** Subsidised access to qualifying students
-- **Real-time collaboration:** Teachers and students comment on AI-generated content within the platform
-
----
 
 ## Getting Started (Development)
 
