@@ -2,6 +2,8 @@
 
 **An AI-powered, accessibility-first educational platform for students with disabilities and diverse learning preferences.**
 
+**Production:** [everymind-ai.vercel.app](https://everymind-ai.vercel.app/)
+
 ---
 
 ## The Problem
