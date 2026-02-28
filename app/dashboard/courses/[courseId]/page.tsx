@@ -3,7 +3,6 @@
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { CourseViewer } from "@/components/courses/course-viewer";
@@ -40,6 +39,13 @@ type ProgressMap = Record<
   { completed: boolean; timeSpent: number; performanceData: unknown }
 >;
 
+const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
+  READY: { label: "Ready", bg: "bg-[#C8F0D8]", text: "text-[#3D8A5A]" },
+  PROCESSING: { label: "Processing", bg: "bg-[#FEF3E2]", text: "text-[#D4A64A]" },
+  DRAFT: { label: "Draft", bg: "bg-[#F5F4F1]", text: "text-[#9C9B99]" },
+  ERROR: { label: "Error", bg: "bg-red-100", text: "text-red-600" },
+};
+
 export default function CourseDetailPage() {
   const { courseId } = useParams<{ courseId: string }>();
   const router = useRouter();
@@ -49,7 +55,6 @@ export default function CourseDetailPage() {
   const [loading, setLoading] = useState(true);
   const [showQuiz, setShowQuiz] = useState(false);
   const [progress, setProgress] = useState<ProgressMap>({});
-  const [copied, setCopied] = useState(false);
 
   const fetchCourse = useCallback(async () => {
     try {
@@ -113,18 +118,8 @@ export default function CourseDetailPage() {
         toast.error("Failed to save progress.");
       }
     },
-    [courseId],
+    [courseId]
   );
-
-  const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error("Failed to copy link.");
-    }
-  };
 
   if (loading) {
     return (
@@ -132,16 +127,21 @@ export default function CourseDetailPage() {
         role="region"
         aria-label="Loading course"
         aria-busy="true"
-        className="mx-auto max-w-4xl px-4 py-12"
+        className="px-14 py-10"
       >
-        <h1 className="sr-only">Loading course</h1>
+        <Skeleton className="mb-4 h-4 w-32" />
         <Skeleton className="mb-4 h-8 w-2/3" />
-        <Skeleton className="mb-8 h-4 w-1/2" />
-        <Skeleton className="mb-8 h-2 w-full" />
-        <div className="space-y-4">
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
+        <Skeleton className="mb-8 h-1 w-full" />
+        <div className="flex gap-8">
+          <div className="flex-1 space-y-4">
+            <Skeleton className="h-32 w-full rounded-2xl" />
+            <Skeleton className="h-32 w-full rounded-2xl" />
+            <Skeleton className="h-32 w-full rounded-2xl" />
+          </div>
+          <div className="w-80 space-y-4">
+            <Skeleton className="h-48 w-full rounded-2xl" />
+            <Skeleton className="h-32 w-full rounded-2xl" />
+          </div>
         </div>
       </div>
     );
@@ -151,95 +151,225 @@ export default function CourseDetailPage() {
 
   const textSections = course.contents.filter((c) => c.contentType === "TEXT");
   const completedCount = textSections.filter(
-    (c) => progress[c.id]?.completed,
+    (c) => progress[c.id]?.completed
   ).length;
   const totalSections = textSections.length;
   const progressPercent =
     totalSections > 0 ? Math.round((completedCount / totalSections) * 100) : 0;
 
+  const cfg = STATUS_CONFIG[course.status] ?? STATUS_CONFIG.DRAFT;
+
+  // Derive key terms from the first text section
+  const firstTextSection =
+    textSections.length > 0
+      ? (() => {
+          try {
+            return JSON.parse(textSections[0].contentData) as {
+              title: string;
+              keyTerms?: { term: string; definition: string }[];
+            };
+          } catch {
+            return null;
+          }
+        })()
+      : null;
+  const keyTerms = firstTextSection?.keyTerms?.slice(0, 3) ?? [];
+
+  // Section titles for TOC
+  const sectionTitles = textSections.slice(0, 5).map((c) => {
+    try {
+      return (JSON.parse(c.contentData) as { title: string }).title;
+    } catch {
+      return "";
+    }
+  });
+
   return (
-    <div className="mx-auto max-w-4xl px-4 py-12">
-      <nav aria-label="Breadcrumb" className="mb-6">
+    <div className="px-14 py-10">
+      {/* Breadcrumb */}
+      <nav aria-label="Breadcrumb" className="mb-4 flex items-center gap-2">
         <Link
           href="/dashboard/courses"
-          className="text-sm text-muted-foreground hover:underline"
+          className="text-sm text-[#9C9B99] hover:text-[#6D6C6A] transition-colors"
         >
-          ← Courses
+          My Courses
         </Link>
+        <span className="text-sm text-[#D1D0CD]">›</span>
+        <span className="text-sm font-medium text-[#1A1918] line-clamp-1">
+          {course.title}
+        </span>
       </nav>
-      <div className="mb-8">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold">{course.title}</h1>
-            {course.description && (
-              <p className="mt-2 text-muted-foreground">{course.description}</p>
-            )}
-          </div>
-          {course.isCreator && course.status === "READY" && (
-            <Button variant="outline" size="sm" onClick={handleCopyLink}>
-              {copied ? "Copied!" : "Copy share link"}
-            </Button>
-          )}
-        </div>
 
-        {course.status === "READY" && totalSections > 0 && (
-          <div className="mt-4">
-            <div className="mb-1 flex items-center justify-between text-sm text-muted-foreground">
-              <span>
-                {completedCount} of {totalSections} sections completed
-              </span>
-              <span>{progressPercent}%</span>
-            </div>
-            <div
-              className="h-2 w-full overflow-hidden rounded-full bg-muted"
-              role="progressbar"
-              aria-valuenow={progressPercent}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label="Course progress"
+      {/* Header */}
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-[26px] font-bold text-[#1A1918]">{course.title}</h1>
+          <div className="flex items-center gap-3">
+            <span
+              className={`rounded-full px-3 py-1 text-[11px] font-semibold ${cfg.bg} ${cfg.text}`}
             >
-              <div
-                className="h-full bg-primary transition-all"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
+              {cfg.label}
+            </span>
           </div>
+        </div>
+        {course.status === "READY" && (
+          <button
+            onClick={loadQuiz}
+            className="flex-shrink-0 rounded-full bg-[#1A1918] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-80"
+          >
+            Take quiz
+          </button>
         )}
       </div>
 
-      {course.status !== "READY" && (
-        <GenerationStatus
-          courseId={course.id}
-          initialStatus={course.status}
-          onReady={fetchCourse}
-          isCreator={course.isCreator}
-        />
+      {/* Progress bar */}
+      {course.status === "READY" && totalSections > 0 && (
+        <div className="mb-5 flex flex-col gap-1.5">
+          <span className="text-xs text-[#9C9B99]">{progressPercent}% complete</span>
+          <div
+            className="h-1 w-full overflow-hidden rounded-full bg-[#E5E4E1]"
+            role="progressbar"
+            aria-valuenow={progressPercent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Course progress"
+          >
+            <div
+              className="h-full rounded-full bg-[#3D8A5A] transition-all"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
       )}
 
-      {course.status === "READY" && (
-        <>
-          <CourseViewer
+      {/* Not ready */}
+      {course.status !== "READY" && (
+        <div className="mt-4">
+          <GenerationStatus
             courseId={course.id}
-            contents={course.contents}
-            progress={progress}
-            onSectionComplete={handleSectionComplete}
+            initialStatus={course.status}
+            onReady={fetchCourse}
+            isCreator={course.isCreator}
           />
+        </div>
+      )}
 
-          <div className="mt-12 border-t pt-8">
-            <h2 className="mb-4 text-2xl font-bold">Quiz</h2>
-            {!showQuiz ? (
-              <Button onClick={loadQuiz}>Take Quiz</Button>
-            ) : loadingQuiz ? (
-              <p aria-live="polite">Generating quiz...</p>
-            ) : quiz ? (
-              <Quiz courseId={course.id} questions={quiz.questions} />
-            ) : (
-              <p role="alert" className="text-sm text-destructive">
-                Failed to load quiz. Please try again later.
-              </p>
+      {/* Ready — tabs + content */}
+      {course.status === "READY" && (
+        <div className="flex gap-8">
+          {/* Left — course content */}
+          <div className="min-w-0 flex-1">
+            <CourseViewer
+              courseId={course.id}
+              contents={course.contents}
+              progress={progress}
+              onSectionComplete={handleSectionComplete}
+            />
+
+            {/* Quiz section */}
+            {showQuiz && (
+              <div className="mt-10 rounded-2xl bg-white p-6">
+                <h2 className="mb-4 text-lg font-bold text-[#1A1918]">Quiz</h2>
+                {loadingQuiz ? (
+                  <p aria-live="polite" className="text-sm text-[#9C9B99]">
+                    Generating quiz…
+                  </p>
+                ) : quiz ? (
+                  <Quiz courseId={course.id} questions={quiz.questions} />
+                ) : (
+                  <p role="alert" className="text-sm text-red-600">
+                    Failed to load quiz. Please try again later.
+                  </p>
+                )}
+              </div>
             )}
           </div>
-        </>
+
+          {/* Right panel */}
+          <aside className="flex w-80 flex-shrink-0 flex-col gap-4">
+            {/* TOC */}
+            {sectionTitles.length > 0 && (
+              <div className="rounded-2xl bg-white p-5">
+                <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-[#9C9B99]">
+                  On this page
+                </p>
+                <div className="flex flex-col gap-1">
+                  {sectionTitles.map((title, i) => (
+                    <div
+                      key={i}
+                      className={`flex items-center gap-2.5 rounded-lg px-3 py-2 ${
+                        i === 0 ? "bg-[#EBF7F0]" : ""
+                      }`}
+                    >
+                      <span
+                        className={`h-3.5 w-0.5 flex-shrink-0 rounded-full ${
+                          i === 0 ? "bg-[#3D8A5A]" : "bg-[#E5E4E1]"
+                        }`}
+                      />
+                      <span
+                        className={`text-sm ${
+                          i === 0
+                            ? "font-semibold text-[#3D8A5A]"
+                            : "text-[#6D6C6A]"
+                        }`}
+                      >
+                        {title}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Progress card */}
+            {totalSections > 0 && (
+              <div className="rounded-2xl bg-[#3D8A5A] p-5">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[#C8F0D8]">
+                  Your Progress
+                </p>
+                <p className="mb-1 text-4xl font-bold text-white">
+                  {progressPercent}%
+                </p>
+                <p className="mb-4 text-sm text-[#C8F0D8]">
+                  {completedCount} of {totalSections} sections complete
+                </p>
+                <div
+                  className="h-1 w-full overflow-hidden rounded-full"
+                  style={{ background: "rgba(255,255,255,0.25)" }}
+                >
+                  <div
+                    className="h-full rounded-full bg-white transition-all"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Key terms */}
+            {keyTerms.length > 0 && (
+              <div className="rounded-2xl bg-white p-5">
+                <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-[#9C9B99]">
+                  Key Terms
+                </p>
+                <div className="flex flex-col gap-2">
+                  {keyTerms.map((kt) => (
+                    <div
+                      key={kt.term}
+                      className="flex flex-col gap-0.5 rounded-lg bg-[#F5F4F1] px-3 py-2.5"
+                    >
+                      <span className="text-sm font-semibold text-[#1A1918]">
+                        {kt.term}
+                      </span>
+                      <span className="text-xs text-[#6D6C6A]">
+                        {kt.definition}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </aside>
+        </div>
       )}
     </div>
   );

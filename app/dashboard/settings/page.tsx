@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { DISABILITY_OPTIONS, PREFERENCE_OPTIONS, FONT_SIZE_OPTIONS } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 
 type OutputMode = "visual" | "video" | "interactive";
 
@@ -58,6 +58,43 @@ const defaultForm: FormState = {
   isDefault: false,
 };
 
+function TogglePill({
+  label,
+  checked,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onChange}
+      disabled={disabled}
+      className={cn(
+        "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
+        checked
+          ? "bg-[#EBF7F0] text-[#3D8A5A]"
+          : "bg-[#F5F4F1] text-[#6D6C6A] hover:bg-[#ECEAE7]",
+        disabled && "cursor-not-allowed opacity-50"
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-[#9C9B99]">
+      {children}
+    </p>
+  );
+}
+
 export default function SettingsPage() {
   const [profiles, setProfiles] = useState<StudentProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,19 +106,14 @@ export default function SettingsPage() {
 
   async function fetchProfiles() {
     const res = await fetch("/api/student-profiles");
-    if (res.ok) {
-      setProfiles(await res.json());
-    }
+    if (res.ok) setProfiles(await res.json());
     setLoading(false);
   }
 
   useEffect(() => {
     fetch("/api/student-profiles")
       .then((r) => (r.ok ? r.json() : []))
-      .then((data: StudentProfile[]) => {
-        setProfiles(data);
-        setLoading(false);
-      })
+      .then((data: StudentProfile[]) => { setProfiles(data); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
@@ -120,10 +152,7 @@ export default function SettingsPage() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) {
-      setError("Name is required");
-      return;
-    }
+    if (!form.name.trim()) { setError("Profile name is required"); return; }
     setSaving(true);
     setError(null);
 
@@ -149,110 +178,136 @@ export default function SettingsPage() {
   }
 
   async function handleDelete(id: string, name: string) {
-    if (!confirm(`Delete profile "${name}"? This cannot be undone.`)) return;
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
     const res = await fetch(`/api/student-profiles/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      setProfiles((prev) => prev.filter((p) => p.id !== id));
-    }
+    if (res.ok) setProfiles((prev) => prev.filter((p) => p.id !== id));
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-12">
-      <h1 className="mb-2 text-3xl font-bold">Student Profiles</h1>
-      <p className="mb-8 text-muted-foreground">
-        Create named profiles for student groups (e.g., &ldquo;ADHD Class&rdquo;, &ldquo;Deaf Students&rdquo;). Select a profile when creating a course to adapt AI-generated content for that group.
-      </p>
+    <div className="px-14 py-12">
+      {/* Header */}
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-[28px] font-bold text-[#1A1918]">Student Profiles</h1>
+          <p className="mt-1 text-sm text-[#9C9B99]">
+            Customize AI-generated content for specific student groups
+          </p>
+        </div>
+        {!showForm && (
+          <button
+            onClick={startCreate}
+            className="flex items-center gap-2 rounded-full bg-[#3D8A5A] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          >
+            + New profile
+          </button>
+        )}
+      </div>
 
+      {/* Form */}
       {showForm && (
-        <section
-          aria-label={editingId ? "Edit student profile" : "New student profile"}
-          className="mb-8 rounded-lg border p-6"
-        >
-          <h2 className="mb-4 text-xl font-semibold">
-            {editingId ? "Edit Student Profile" : "New Student Profile"}
-          </h2>
-          <form onSubmit={handleSave} className="space-y-5">
-            <div>
-              <label htmlFor="prof-name" className="mb-1 block text-sm font-medium">
-                Profile Name <span aria-hidden>*</span>
-              </label>
-              <input
-                id="prof-name"
-                type="text"
-                required
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                className="w-full rounded-md border px-3 py-2 text-sm"
-                placeholder="e.g. ADHD Class, Deaf Students, Dyslexia Group"
-                disabled={saving}
-              />
+        <div className="mb-8 rounded-2xl bg-white p-8">
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-[#1A1918]">
+              {editingId ? "Edit Profile" : "New Student Profile"}
+            </h2>
+            <button
+              type="button"
+              onClick={cancelForm}
+              className="text-sm text-[#9C9B99] hover:text-[#6D6C6A]"
+            >
+              Cancel
+            </button>
+          </div>
+
+          <form onSubmit={handleSave} className="space-y-8">
+            {/* Name & Description */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="prof-name" className="mb-1.5 block text-sm font-medium text-[#1A1918]">
+                  Profile name <span className="text-[#3D8A5A]">*</span>
+                </label>
+                <input
+                  id="prof-name"
+                  type="text"
+                  required
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  className="w-full rounded-xl border border-[#E5E4E1] bg-[#F5F4F1] px-4 py-2.5 text-sm text-[#1A1918] outline-none transition-colors placeholder:text-[#C1C0BE] focus:border-[#3D8A5A] focus:bg-white"
+                  placeholder="e.g. ADHD Class, Deaf Students"
+                  disabled={saving}
+                />
+              </div>
+              <div>
+                <label htmlFor="prof-desc" className="mb-1.5 block text-sm font-medium text-[#1A1918]">
+                  Description
+                </label>
+                <input
+                  id="prof-desc"
+                  type="text"
+                  value={form.description}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                  className="w-full rounded-xl border border-[#E5E4E1] bg-[#F5F4F1] px-4 py-2.5 text-sm text-[#1A1918] outline-none transition-colors placeholder:text-[#C1C0BE] focus:border-[#3D8A5A] focus:bg-white"
+                  placeholder="Short description of this group"
+                  disabled={saving}
+                />
+              </div>
             </div>
 
-            <div>
-              <label htmlFor="prof-desc" className="mb-1 block text-sm font-medium">
-                Description
-              </label>
-              <input
-                id="prof-desc"
-                type="text"
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                className="w-full rounded-md border px-3 py-2 text-sm"
-                placeholder="Short description of this student group"
-                disabled={saving}
-              />
-            </div>
+            {/* Divider */}
+            <div className="border-t border-[#F0EFED]" />
 
-            <fieldset>
-              <legend className="mb-2 text-sm font-medium">Disabilities / Learning Needs</legend>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {/* Learning Needs */}
+            <div>
+              <SectionLabel>Learning Needs</SectionLabel>
+              <div className="flex flex-wrap gap-2">
                 {DISABILITY_OPTIONS.filter((o) => o.value !== "none").map((option) => (
-                  <label key={option.value} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={form.disabilities.includes(option.value)}
-                      onChange={() =>
-                        setForm((f) => ({
-                          ...f,
-                          disabilities: toggleArrayItem(f.disabilities, option.value),
-                        }))
-                      }
-                      disabled={saving}
-                    />
-                    {option.label}
-                  </label>
+                  <TogglePill
+                    key={option.value}
+                    label={option.label}
+                    checked={form.disabilities.includes(option.value)}
+                    onChange={() =>
+                      setForm((f) => ({
+                        ...f,
+                        disabilities: toggleArrayItem(f.disabilities, option.value),
+                      }))
+                    }
+                    disabled={saving}
+                  />
                 ))}
               </div>
-            </fieldset>
+            </div>
 
-            <fieldset>
-              <legend className="mb-2 text-sm font-medium">Learning Preferences</legend>
-              <div className="grid grid-cols-2 gap-2">
+            {/* Learning Preferences */}
+            <div>
+              <SectionLabel>Learning Preferences</SectionLabel>
+              <div className="flex flex-wrap gap-2">
                 {PREFERENCE_OPTIONS.map((option) => (
-                  <label key={option.value} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={form.preferences.includes(option.value)}
-                      onChange={() =>
-                        setForm((f) => ({
-                          ...f,
-                          preferences: toggleArrayItem(f.preferences, option.value),
-                        }))
-                      }
-                      disabled={saving}
-                    />
-                    {option.label}
-                  </label>
+                  <TogglePill
+                    key={option.value}
+                    label={option.label}
+                    checked={form.preferences.includes(option.value)}
+                    onChange={() =>
+                      setForm((f) => ({
+                        ...f,
+                        preferences: toggleArrayItem(f.preferences, option.value),
+                      }))
+                    }
+                    disabled={saving}
+                  />
                 ))}
               </div>
-            </fieldset>
+            </div>
 
-            <fieldset>
-              <legend className="mb-3 text-sm font-medium">Accessibility Settings</legend>
-              <div className="space-y-3">
+            {/* Divider */}
+            <div className="border-t border-[#F0EFED]" />
+
+            {/* Accessibility */}
+            <div>
+              <SectionLabel>Accessibility</SectionLabel>
+              <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label htmlFor="prof-fontsize" className="mb-1 block text-sm">
-                    Font Size
+                  <label htmlFor="prof-fontsize" className="mb-1.5 block text-sm font-medium text-[#1A1918]">
+                    Font size
                   </label>
                   <select
                     id="prof-fontsize"
@@ -263,209 +318,210 @@ export default function SettingsPage() {
                         accessibilityNeeds: { ...f.accessibilityNeeds, fontSize: e.target.value },
                       }))
                     }
-                    className="rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-xl border border-[#E5E4E1] bg-[#F5F4F1] px-4 py-2.5 text-sm text-[#1A1918] outline-none focus:border-[#3D8A5A] focus:bg-white"
                     disabled={saving}
                   >
                     {FONT_SIZE_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
+                      <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
                   </select>
                 </div>
-
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={form.accessibilityNeeds.highContrast}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        accessibilityNeeds: {
-                          ...f.accessibilityNeeds,
-                          highContrast: e.target.checked,
-                        },
-                      }))
-                    }
-                    disabled={saving}
-                  />
-                  High contrast mode
-                </label>
-
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={form.accessibilityNeeds.reducedMotion}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        accessibilityNeeds: {
-                          ...f.accessibilityNeeds,
-                          reducedMotion: e.target.checked,
-                        },
-                      }))
-                    }
-                    disabled={saving}
-                  />
-                  Reduced motion
-                </label>
-
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={form.accessibilityNeeds.screenReaderOptimized}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        accessibilityNeeds: {
-                          ...f.accessibilityNeeds,
-                          screenReaderOptimized: e.target.checked,
-                        },
-                      }))
-                    }
-                    disabled={saving}
-                  />
-                  Screen reader optimized content
-                </label>
+                <div className="flex flex-col gap-3 pt-1">
+                  {[
+                    { key: "highContrast", label: "High contrast mode" },
+                    { key: "reducedMotion", label: "Reduced motion" },
+                    { key: "screenReaderOptimized", label: "Screen reader optimized" },
+                  ].map(({ key, label }) => (
+                    <label key={key} className="flex cursor-pointer items-center gap-3">
+                      <div
+                        className={cn(
+                          "flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border-2 transition-colors",
+                          form.accessibilityNeeds[key as keyof typeof form.accessibilityNeeds]
+                            ? "border-[#3D8A5A] bg-[#3D8A5A]"
+                            : "border-[#D1D0CD] bg-white"
+                        )}
+                        onClick={() =>
+                          !saving &&
+                          setForm((f) => ({
+                            ...f,
+                            accessibilityNeeds: {
+                              ...f.accessibilityNeeds,
+                              [key]: !f.accessibilityNeeds[key as keyof typeof f.accessibilityNeeds],
+                            },
+                          }))
+                        }
+                      >
+                        {form.accessibilityNeeds[key as keyof typeof form.accessibilityNeeds] && (
+                          <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className="text-sm text-[#6D6C6A]">{label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
-            </fieldset>
+            </div>
 
-            <fieldset>
-              <legend className="mb-2 text-sm font-medium">Output Formats</legend>
-              <p className="mb-2 text-xs text-muted-foreground">
-                Select which additional content formats to generate when creating courses with this profile. Text is always generated.
+            {/* Output Formats */}
+            <div>
+              <SectionLabel>Output Formats</SectionLabel>
+              <p className="mb-3 text-xs text-[#9C9B99]">
+                Additional content formats generated alongside text.
               </p>
-              <div className="space-y-2">
+              <div className="flex flex-wrap gap-2">
                 {OUTPUT_MODE_OPTIONS.map((option) => (
-                  <label key={option.value} className="flex items-start gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      className="mt-0.5"
-                      checked={form.outputModes.includes(option.value)}
-                      onChange={() =>
-                        setForm((f) => ({
-                          ...f,
-                          outputModes: toggleArrayItem(f.outputModes, option.value) as OutputMode[],
-                        }))
-                      }
-                      disabled={saving}
-                    />
-                    <span>
-                      <span className="font-medium">{option.label}</span>
-                      {" — "}
-                      <span className="text-muted-foreground">{option.description}</span>
-                    </span>
-                  </label>
+                  <TogglePill
+                    key={option.value}
+                    label={option.label}
+                    checked={form.outputModes.includes(option.value)}
+                    onChange={() =>
+                      setForm((f) => ({
+                        ...f,
+                        outputModes: toggleArrayItem(f.outputModes, option.value) as OutputMode[],
+                      }))
+                    }
+                    disabled={saving}
+                  />
                 ))}
               </div>
-            </fieldset>
+            </div>
 
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={form.isDefault}
-                onChange={(e) => setForm((f) => ({ ...f, isDefault: e.target.checked }))}
-                disabled={saving}
-              />
-              Set as default profile
+            {/* Default toggle */}
+            <label className="flex cursor-pointer items-center gap-3">
+              <div
+                className={cn(
+                  "flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border-2 transition-colors",
+                  form.isDefault ? "border-[#3D8A5A] bg-[#3D8A5A]" : "border-[#D1D0CD] bg-white"
+                )}
+                onClick={() => !saving && setForm((f) => ({ ...f, isDefault: !f.isDefault }))}
+              >
+                {form.isDefault && (
+                  <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </div>
+              <span className="text-sm text-[#6D6C6A]">Set as default profile</span>
             </label>
 
             {error && (
-              <p role="alert" className="text-sm text-red-600">
+              <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
                 {error}
               </p>
             )}
 
             <div className="flex gap-3">
-              <Button type="submit" disabled={saving}>
-                {saving ? "Saving..." : "Save Profile"}
-              </Button>
-              <Button type="button" variant="outline" onClick={cancelForm} disabled={saving}>
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-full bg-[#3D8A5A] px-6 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+              >
+                {saving ? "Saving…" : "Save profile"}
+              </button>
+              <button
+                type="button"
+                onClick={cancelForm}
+                disabled={saving}
+                className="rounded-full border border-[#E5E4E1] px-6 py-2.5 text-sm font-semibold text-[#6D6C6A] transition-colors hover:bg-[#F5F4F1]"
+              >
                 Cancel
-              </Button>
+              </button>
             </div>
           </form>
-        </section>
+        </div>
       )}
 
-      {!showForm && (
-        <Button onClick={startCreate} className="mb-6">
-          New Student Profile
-        </Button>
-      )}
-
+      {/* Profile list */}
       {loading ? (
-        <p className="text-muted-foreground">Loading profiles...</p>
-      ) : profiles.length === 0 ? (
-        <p className="text-muted-foreground">
-          No profiles yet. Create one to customize AI course generation for specific student groups.
-        </p>
+        <div className="space-y-4">
+          {[1, 2].map((i) => (
+            <div key={i} className="h-28 animate-pulse rounded-2xl bg-white" />
+          ))}
+        </div>
+      ) : profiles.length === 0 && !showForm ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#E5E4E1] py-24 text-center">
+          <h3 className="mb-2 text-lg font-semibold text-[#1A1918]">No profiles yet</h3>
+          <p className="mb-6 text-sm text-[#9C9B99]">
+            Create a profile to adapt AI content for specific student groups
+          </p>
+          <button
+            onClick={startCreate}
+            className="rounded-full bg-[#3D8A5A] px-6 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          >
+            + New profile
+          </button>
+        </div>
       ) : (
         <ul className="space-y-4">
           {profiles.map((profile) => (
-            <li key={profile.id} className="rounded-lg border p-4">
+            <li key={profile.id} className="rounded-2xl bg-white p-6">
               <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
+                  {/* Name + default badge */}
                   <div className="flex items-center gap-2">
-                    <h3 className="font-semibold">{profile.name}</h3>
+                    <h3 className="text-base font-semibold text-[#1A1918]">{profile.name}</h3>
                     {profile.isDefault && (
-                      <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                      <span className="rounded-full bg-[#EBF7F0] px-2.5 py-0.5 text-[11px] font-semibold text-[#3D8A5A]">
                         Default
                       </span>
                     )}
                   </div>
+
+                  {/* Description */}
                   {profile.description && (
-                    <p className="mt-1 text-sm text-muted-foreground">{profile.description}</p>
+                    <p className="mt-1 text-sm text-[#9C9B99]">{profile.description}</p>
                   )}
-                  {profile.disabilities.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {profile.disabilities.map((d) => {
-                        const option = DISABILITY_OPTIONS.find((o) => o.value === d);
-                        return (
-                          <span key={d} className="rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
-                            {option?.label ?? d}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {profile.preferences.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {profile.preferences.map((p) => {
-                        const option = PREFERENCE_OPTIONS.find((o) => o.value === p);
-                        return (
-                          <span key={p} className="rounded bg-muted px-2 py-0.5 text-xs">
-                            {option?.label ?? p}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {profile.outputModes?.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {profile.outputModes.map((m) => {
-                        const option = OUTPUT_MODE_OPTIONS.find((o) => o.value === m);
-                        return (
-                          <span key={m} className="rounded bg-green-50 px-2 py-0.5 text-xs text-green-700">
-                            {option?.label ?? m}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
+
+                  {/* Tags */}
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {profile.disabilities.map((d) => {
+                      const option = DISABILITY_OPTIONS.find((o) => o.value === d);
+                      return (
+                        <span key={d} className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-600">
+                          {option?.label ?? d}
+                        </span>
+                      );
+                    })}
+                    {profile.preferences.map((p) => {
+                      const option = PREFERENCE_OPTIONS.find((o) => o.value === p);
+                      return (
+                        <span key={p} className="rounded-full bg-[#F5F4F1] px-2.5 py-0.5 text-xs font-medium text-[#6D6C6A]">
+                          {option?.label ?? p}
+                        </span>
+                      );
+                    })}
+                    {profile.outputModes?.map((m) => {
+                      const option = OUTPUT_MODE_OPTIONS.find((o) => o.value === m);
+                      return (
+                        <span key={m} className="rounded-full bg-[#EBF7F0] px-2.5 py-0.5 text-xs font-medium text-[#3D8A5A]">
+                          {option?.label ?? m}
+                        </span>
+                      );
+                    })}
+                    {profile.disabilities.length === 0 &&
+                      profile.preferences.length === 0 &&
+                      (profile.outputModes?.length ?? 0) === 0 && (
+                        <span className="text-xs text-[#C1C0BE]">No settings configured</span>
+                      )}
+                  </div>
                 </div>
-                <div className="flex shrink-0 gap-2">
-                  <Button variant="outline" size="sm" onClick={() => startEdit(profile)}>
+
+                {/* Actions */}
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    onClick={() => startEdit(profile)}
+                    className="rounded-full border border-[#E5E4E1] px-4 py-1.5 text-sm font-medium text-[#6D6C6A] transition-colors hover:bg-[#F5F4F1]"
+                  >
                     Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
+                  </button>
+                  <button
                     onClick={() => handleDelete(profile.id, profile.name)}
-                    className="text-red-600 hover:text-red-700"
+                    className="rounded-full border border-[#E5E4E1] px-4 py-1.5 text-sm font-medium text-red-500 transition-colors hover:border-red-200 hover:bg-red-50"
                   >
                     Delete
-                  </Button>
+                  </button>
                 </div>
               </div>
             </li>

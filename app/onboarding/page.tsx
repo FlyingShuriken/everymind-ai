@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getUserByClerkId } from "@/lib/db/users";
 import { getLearningProfile } from "@/lib/db/learning-profiles";
 import { AssessmentWizard } from "@/components/onboarding/assessment-wizard";
@@ -9,7 +10,6 @@ export default async function OnboardingPage() {
   if (!clerkId) redirect("/sign-in");
 
   const user = await getUserByClerkId(clerkId);
-
   if (user) {
     const learningProfile = await getLearningProfile(user.id);
     if (learningProfile?.completedAt) {
@@ -18,14 +18,18 @@ export default async function OnboardingPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-12">
-      <h1 className="mb-8 text-center text-3xl font-bold">
-        Set up your learning profile
-      </h1>
-      <p className="mb-8 text-center text-muted-foreground">
-        Help us understand how you learn best. This takes about 2 minutes.
-      </p>
-      <AssessmentWizard />
+    <div className="min-h-screen bg-[#F5F4F1]">
+      <div className="px-16 py-8">
+        <Link
+          href="/"
+          className="text-lg font-bold tracking-[-0.5px] text-[#1A1918]"
+        >
+          everymind
+        </Link>
+      </div>
+      <div className="flex items-center justify-center px-4 pb-16">
+        <AssessmentWizard />
+      </div>
     </div>
   );
 }

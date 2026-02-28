@@ -57,7 +57,9 @@ export function CourseViewer({
   const textSections = contents.filter((c) => c.contentType === "TEXT");
   const visualContents = contents.filter((c) => c.contentType === "VISUAL");
   const videoContents = contents.filter((c) => c.contentType === "VIDEO");
-  const interactiveContents = contents.filter((c) => c.contentType === "INTERACTIVE");
+  const interactiveContents = contents.filter(
+    (c) => c.contentType === "INTERACTIVE"
+  );
 
   const availableTabs: Tab[] = ["text"];
   if (visualContents.length > 0) availableTabs.push("visual");
@@ -67,28 +69,37 @@ export function CourseViewer({
   const [activeTab, setActiveTab] = useState<Tab>("text");
 
   return (
-    <div className="space-y-6">
-      {/* Tab navigation */}
+    <div>
+      {/* Tab row */}
       {availableTabs.length > 1 && (
-        <nav aria-label="Course content formats" className="border-b">
-          <ul role="tablist" className="flex gap-1">
-            {availableTabs.map((tab) => (
-              <li key={tab} role="presentation">
-                <button
-                  role="tab"
-                  aria-selected={activeTab === tab}
-                  aria-controls={`tab-panel-${tab}`}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${
-                    activeTab === tab
-                      ? "border-b-2 border-primary text-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {TAB_LABELS[tab]}
-                </button>
-              </li>
-            ))}
+        <nav
+          aria-label="Course content formats"
+          className="mb-5 border-b border-[#E5E4E1]"
+        >
+          <ul role="tablist" className="flex">
+            {availableTabs.map((tab) => {
+              const active = activeTab === tab;
+              return (
+                <li key={tab} role="presentation">
+                  <button
+                    role="tab"
+                    aria-selected={active}
+                    aria-controls={`tab-panel-${tab}`}
+                    onClick={() => setActiveTab(tab)}
+                    className={`relative flex flex-col items-center px-5 pb-0 pt-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                      active
+                        ? "font-semibold text-[#1A1918]"
+                        : "font-medium text-[#9C9B99] hover:text-[#6D6C6A]"
+                    }`}
+                  >
+                    {TAB_LABELS[tab]}
+                    {active && (
+                      <span className="mt-2 block h-0.5 w-8 rounded-full bg-[#3D8A5A]" />
+                    )}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </nav>
       )}
@@ -100,15 +111,17 @@ export function CourseViewer({
         aria-label="Text content"
         hidden={activeTab !== "text"}
       >
-        <div className="space-y-8">
+        <div className="flex flex-col gap-4">
           {textSections.map((content) => {
             const data: SectionData = JSON.parse(content.contentData);
             const metadata = JSON.parse(content.metadata || "{}");
-
             const isCompleted = progress[content.id]?.completed ?? false;
 
             return (
-              <article key={content.id} className="space-y-4">
+              <article
+                key={content.id}
+                className="rounded-2xl bg-white"
+              >
                 <details
                   onToggle={(e) => {
                     if (
@@ -120,22 +133,24 @@ export function CourseViewer({
                     }
                   }}
                 >
-                  <summary className="cursor-pointer text-xl font-semibold">
-                    <span className="inline-flex items-center gap-2">
+                  <summary className="flex cursor-pointer items-center justify-between gap-3 p-6">
+                    <span className="text-base font-semibold text-[#1A1918]">
                       {data.title}
+                    </span>
+                    <span className="flex items-center gap-2">
                       {isCompleted && (
                         <span
                           aria-label="Completed"
-                          className="text-base text-green-600"
+                          className="rounded-full bg-[#C8F0D8] px-2.5 py-0.5 text-xs font-semibold text-[#3D8A5A]"
                         >
-                          ✓
+                          ✓ Done
                         </span>
                       )}
                     </span>
                   </summary>
 
-                  <div className="mt-4 space-y-4 pl-1">
-                    <div className="prose prose-sm max-w-none">
+                  <div className="px-6 pb-6">
+                    <div className="prose prose-sm max-w-none text-[#3D3C3A]">
                       <ReactMarkdown
                         remarkPlugins={[remarkMath]}
                         rehypePlugins={[rehypeKatex]}
@@ -144,16 +159,18 @@ export function CourseViewer({
                       </ReactMarkdown>
                     </div>
 
-                    {data.keyTerms.length > 0 && (
-                      <details className="rounded-md border p-3">
-                        <summary className="cursor-pointer text-sm font-medium">
+                    {data.keyTerms?.length > 0 && (
+                      <details className="mt-4 rounded-xl border border-[#E5E4E1]">
+                        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-[#1A1918]">
                           Key Terms ({data.keyTerms.length})
                         </summary>
-                        <dl className="mt-2 space-y-2">
+                        <dl className="divide-y divide-[#F5F4F1] px-4 pb-3">
                           {data.keyTerms.map((kt) => (
-                            <div key={kt.term}>
-                              <dt className="text-sm font-medium">{kt.term}</dt>
-                              <dd className="text-sm text-muted-foreground">
+                            <div key={kt.term} className="py-2">
+                              <dt className="text-sm font-semibold text-[#1A1918]">
+                                {kt.term}
+                              </dt>
+                              <dd className="text-sm text-[#6D6C6A]">
                                 {kt.definition}
                               </dd>
                             </div>
@@ -162,17 +179,21 @@ export function CourseViewer({
                       </details>
                     )}
 
-                    <div className="rounded-md bg-muted p-3">
-                      <h3 className="mb-1 text-sm font-medium">Summary</h3>
-                      <p className="text-sm">{data.summary}</p>
+                    <div className="mt-4 rounded-xl bg-[#F5F4F1] px-4 py-3">
+                      <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-[#9C9B99]">
+                        Summary
+                      </h3>
+                      <p className="text-sm text-[#3D3C3A]">{data.summary}</p>
                     </div>
 
-                    <AudioPlayer
-                      courseId={courseId}
-                      contentId={content.id}
-                      transcript={stripMarkdown(data.body)}
-                      cachedUrl={metadata.audioUrl}
-                    />
+                    <div className="mt-4">
+                      <AudioPlayer
+                        courseId={courseId}
+                        contentId={content.id}
+                        transcript={stripMarkdown(data.body)}
+                        cachedUrl={metadata.audioUrl}
+                      />
+                    </div>
                   </div>
                 </details>
               </article>
@@ -189,15 +210,22 @@ export function CourseViewer({
           aria-label="Visual content"
           hidden={activeTab !== "visual"}
         >
-          <div className="space-y-8">
+          <div className="flex flex-col gap-6">
             {visualContents.map((content) => {
               const data = JSON.parse(content.contentData) as {
-                images: Array<{ url: string; caption: string; altText: string; sectionTitle: string }>;
+                images: Array<{
+                  url: string;
+                  caption: string;
+                  altText: string;
+                  sectionTitle: string;
+                }>;
                 sectionTitle: string;
               };
               return (
-                <section key={content.id}>
-                  <h3 className="mb-3 font-semibold">{data.sectionTitle}</h3>
+                <section key={content.id} className="rounded-2xl bg-white p-6">
+                  <h3 className="mb-4 text-base font-semibold text-[#1A1918]">
+                    {data.sectionTitle}
+                  </h3>
                   <VisualGallery
                     sectionTitle={data.sectionTitle}
                     images={data.images}
@@ -217,15 +245,17 @@ export function CourseViewer({
           aria-label="Video content"
           hidden={activeTab !== "video"}
         >
-          <div className="space-y-8">
+          <div className="flex flex-col gap-6">
             {videoContents.map((content) => {
               const data = JSON.parse(content.contentData) as {
                 videoUrl: string;
                 sectionTitle: string;
               };
               return (
-                <section key={content.id}>
-                  <h3 className="mb-3 font-semibold">{data.sectionTitle}</h3>
+                <section key={content.id} className="rounded-2xl bg-white p-6">
+                  <h3 className="mb-4 text-base font-semibold text-[#1A1918]">
+                    {data.sectionTitle}
+                  </h3>
                   <VideoPlayer
                     videoUrl={data.videoUrl}
                     sectionTitle={data.sectionTitle}
@@ -245,7 +275,7 @@ export function CourseViewer({
           aria-label="Interactive exercises"
           hidden={activeTab !== "interactive"}
         >
-          <div className="space-y-8">
+          <div className="flex flex-col gap-6">
             {interactiveContents.map((content) => {
               const data = JSON.parse(content.contentData) as {
                 sectionTitle: string;
@@ -260,8 +290,10 @@ export function CourseViewer({
                 }>;
               };
               return (
-                <section key={content.id}>
-                  <h3 className="mb-3 font-semibold">{data.sectionTitle}</h3>
+                <section key={content.id} className="rounded-2xl bg-white p-6">
+                  <h3 className="mb-4 text-base font-semibold text-[#1A1918]">
+                    {data.sectionTitle}
+                  </h3>
                   <InteractiveExercises
                     sectionTitle={data.sectionTitle}
                     exercises={data.exercises}

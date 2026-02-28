@@ -2,9 +2,6 @@
 
 import { useReducer, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { StepRoleSelection } from "./step-role-selection";
 import { StepNeedsSelection } from "./step-needs-selection";
 import { StepPreferences } from "./step-preferences";
@@ -16,10 +13,17 @@ import {
 } from "@/lib/validators";
 
 const STEP_LABELS = [
-  "Your Role",
-  "Learning Needs",
-  "Preferences",
+  "Your role",
+  "Learning needs",
+  "Your learning preferences",
   "Accessibility",
+];
+
+const STEP_SUBTITLES = [
+  "Are you a student or a teacher?",
+  "Do you have any specific learning needs? Select all that apply.",
+  "How do you learn best? Select all that apply.",
+  "Set your accessibility preferences.",
 ];
 
 interface WizardState {
@@ -102,12 +106,13 @@ export function AssessmentWizard() {
         result = needsSchema.safeParse({ disabilities: state.disabilities });
         break;
       case 2:
-        result = preferencesSchema.safeParse({ preferences: state.preferences });
+        result = preferencesSchema.safeParse({
+          preferences: state.preferences,
+        });
         break;
       case 3:
-        return true; // defaults are always valid
+        return true;
     }
-
     if (result && !result.success) {
       const firstIssue = result.error.issues[0];
       dispatch({
@@ -133,7 +138,6 @@ export function AssessmentWizard() {
   async function handleSubmit() {
     if (!validateCurrentStep()) return;
     dispatch({ type: "SET_SUBMITTING", payload: true });
-
     try {
       const res = await fetch("/api/learning-profile", {
         method: "POST",
@@ -145,7 +149,6 @@ export function AssessmentWizard() {
           accessibilityNeeds: state.accessibilityNeeds,
         }),
       });
-
       if (!res.ok) throw new Error("Failed to save profile");
       router.push("/dashboard");
     } catch {
@@ -157,36 +160,40 @@ export function AssessmentWizard() {
     }
   }
 
-  const isLastStep = state.currentStep === STEP_LABELS.length - 1;
-  const progressValue = ((state.currentStep + 1) / STEP_LABELS.length) * 100;
+  const totalSteps = STEP_LABELS.length;
+  const isLastStep = state.currentStep === totalSteps - 1;
 
   return (
-    <Card className="mx-auto w-full max-w-2xl">
-      <CardHeader>
-        <div className="mb-4">
-          <Progress value={progressValue} aria-label={`Step ${state.currentStep + 1} of ${STEP_LABELS.length}`} />
-          <nav aria-label="Wizard progress" className="mt-2">
-            <ol className="flex gap-2 text-sm text-muted-foreground">
-              {STEP_LABELS.map((label, i) => (
-                <li
-                  key={label}
-                  aria-current={i === state.currentStep ? "step" : undefined}
-                  className={i === state.currentStep ? "font-semibold text-foreground" : ""}
-                >
-                  {label}
-                  {i < STEP_LABELS.length - 1 && <span className="ml-2" aria-hidden="true">/</span>}
-                </li>
-              ))}
-            </ol>
-          </nav>
-        </div>
-        <CardTitle>
-          <h2 ref={stepHeadingRef} tabIndex={-1} className="outline-none">
-            {STEP_LABELS[state.currentStep]}
-          </h2>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+    <div className="w-full max-w-[600px] rounded-3xl bg-white p-12">
+      {/* Step indicator */}
+      <div className="mb-8 flex items-center gap-2">
+        {Array.from({ length: totalSteps }).map((_, i) => (
+          <div
+            key={i}
+            className={`h-1 w-6 rounded-full transition-colors ${
+              i <= state.currentStep ? "bg-[#3D8A5A]" : "bg-[#E5E4E1]"
+            }`}
+          />
+        ))}
+        <span className="ml-2 text-xs font-medium text-[#9C9B99]">
+          Step {state.currentStep + 1} of {totalSteps}
+        </span>
+      </div>
+
+      {/* Heading */}
+      <h1
+        ref={stepHeadingRef}
+        tabIndex={-1}
+        className="mb-2 text-[26px] font-bold text-[#1A1918] outline-none"
+      >
+        {STEP_LABELS[state.currentStep]}
+      </h1>
+      <p className="mb-8 text-[15px] text-[#6D6C6A]">
+        {STEP_SUBTITLES[state.currentStep]}
+      </p>
+
+      {/* Step content */}
+      <div className="mb-8">
         {state.currentStep === 0 && (
           <StepRoleSelection
             value={state.role}
@@ -197,45 +204,65 @@ export function AssessmentWizard() {
         {state.currentStep === 1 && (
           <StepNeedsSelection
             value={state.disabilities}
-            onChange={(v) => dispatch({ type: "SET_DISABILITIES", payload: v })}
+            onChange={(v) =>
+              dispatch({ type: "SET_DISABILITIES", payload: v })
+            }
             error={state.errors.disabilities}
           />
         )}
         {state.currentStep === 2 && (
           <StepPreferences
             value={state.preferences}
-            onChange={(v) => dispatch({ type: "SET_PREFERENCES", payload: v })}
+            onChange={(v) =>
+              dispatch({ type: "SET_PREFERENCES", payload: v })
+            }
             error={state.errors.preferences}
           />
         )}
         {state.currentStep === 3 && (
           <StepAccessibility
             value={state.accessibilityNeeds}
-            onChange={(v) => dispatch({ type: "SET_ACCESSIBILITY", payload: v })}
+            onChange={(v) =>
+              dispatch({ type: "SET_ACCESSIBILITY", payload: v })
+            }
           />
         )}
         {state.errors.submit && (
-          <p className="mt-4 text-sm text-destructive" role="alert">
+          <p className="mt-4 text-sm text-red-600" role="alert">
             {state.errors.submit}
           </p>
         )}
-      </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button
-          variant="outline"
+      </div>
+
+      {/* Buttons */}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
           onClick={handleBack}
           disabled={state.currentStep === 0}
+          className="rounded-full bg-[#F5F4F1] px-6 py-3 text-sm font-medium text-[#6D6C6A] transition-colors hover:bg-[#E5E4E1] disabled:opacity-0"
         >
           Back
-        </Button>
+        </button>
         {isLastStep ? (
-          <Button onClick={handleSubmit} disabled={state.submitting}>
-            {state.submitting ? "Saving..." : "Complete Setup"}
-          </Button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={state.submitting}
+            className="rounded-full bg-[#3D8A5A] px-7 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+          >
+            {state.submitting ? "Saving…" : "Complete setup"}
+          </button>
         ) : (
-          <Button onClick={handleNext}>Next</Button>
+          <button
+            type="button"
+            onClick={handleNext}
+            className="rounded-full bg-[#3D8A5A] px-7 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          >
+            Next step →
+          </button>
         )}
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   );
 }

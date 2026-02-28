@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { UploadForm } from "@/components/courses/upload-form";
+import { NewCourseForm } from "@/components/courses/new-course-form";
 
 export default function NewCoursePage() {
   const router = useRouter();
@@ -12,8 +12,10 @@ export default function NewCoursePage() {
 
   useEffect(() => {
     fetch("/api/learning-profile")
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => { if (data?.role === "TEACHER") setIsTeacher(true); })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.role === "TEACHER") setIsTeacher(true);
+      })
       .catch(() => {});
   }, []);
 
@@ -28,7 +30,6 @@ export default function NewCoursePage() {
     setError(null);
 
     try {
-      // Create course
       const res = await fetch("/api/courses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -42,13 +43,11 @@ export default function NewCoursePage() {
 
       const course = await res.json();
 
-      // Trigger generation
       const genRes = await fetch(`/api/courses/${course.id}/generate`, {
         method: "POST",
       });
 
       if (!genRes.ok) {
-        // Course created but generation failed — still navigate
         console.error("Generation failed");
       }
 
@@ -60,19 +59,27 @@ export default function NewCoursePage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-12">
-      <h1 className="mb-8 text-3xl font-bold">Create New Course</h1>
-      <p className="mb-8 text-muted-foreground">
-        Upload a document or enter a topic to generate an accessible course.
+    <div className="px-14 py-12">
+      <p className="mb-2 text-sm text-[#9C9B99]">
+        <a href="/dashboard/courses" className="hover:text-[#1A1918] transition-colors">
+          ← Back to courses
+        </a>
       </p>
+      <h1 className="mb-10 text-[28px] font-bold text-[#1A1918]">
+        Create a new course
+      </h1>
 
       {error && (
-        <p role="alert" className="mb-4 text-sm text-red-600">
+        <p role="alert" className="mb-6 text-sm text-red-600">
           {error}
         </p>
       )}
 
-      <UploadForm onSubmit={handleSubmit} loading={loading} isTeacher={isTeacher} />
+      <NewCourseForm
+        onSubmit={handleSubmit}
+        loading={loading}
+        isTeacher={isTeacher}
+      />
     </div>
   );
 }
