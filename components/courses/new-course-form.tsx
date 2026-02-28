@@ -32,7 +32,11 @@ const INFO_ITEMS = [
   "Personalised for your learner",
 ];
 
-export function NewCourseForm({ onSubmit, loading, isTeacher }: NewCourseFormProps) {
+export function NewCourseForm({
+  onSubmit,
+  loading,
+  isTeacher,
+}: NewCourseFormProps) {
   const [sourceType, setSourceType] = useState<"upload" | "topic">("topic");
   const [title, setTitle] = useState("");
   const [topic, setTopic] = useState("");
@@ -62,7 +66,7 @@ export function NewCourseForm({ onSubmit, loading, isTeacher }: NewCourseFormPro
       (f) =>
         f.type === "application/pdf" ||
         f.type ===
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     );
     if (valid.length === 0) {
       setError("Only PDF and DOCX files are supported");
@@ -83,7 +87,7 @@ export function NewCourseForm({ onSubmit, loading, isTeacher }: NewCourseFormPro
       setDragOver(false);
       handleFiles(e.dataTransfer.files);
     },
-    [handleFiles]
+    [handleFiles],
   );
 
   const removeFile = (index: number) => {
@@ -151,7 +155,7 @@ export function NewCourseForm({ onSubmit, loading, isTeacher }: NewCourseFormPro
     <form onSubmit={handleSubmit}>
       <div className="flex gap-8">
         {/* Left column — form */}
-        <div className="flex w-[640px] flex-shrink-0 flex-col gap-5">
+        <div className="flex w-160 flex-shrink-0 flex-col gap-5">
           {/* Title */}
           <div className="flex flex-col gap-2">
             <label

@@ -45,20 +45,29 @@ function buildStudentContextInstructions(profile: StudentProfileInput): string {
   const lines: string[] = [];
 
   const disabilityMap: Record<string, string> = {
-    "deaf": "Avoid language that assumes hearing (e.g. 'listen to...'). Provide full text for any audio content. Prefer text and visual formats.",
-    "hard-of-hearing": "Avoid language that assumes hearing. Provide text alternatives. Prefer text and visual formats.",
-    "blind": "Do not reference visual elements without describing them fully in text. Avoid phrases like 'see the diagram above'. Describe all concepts in words.",
-    "low-vision": "Use high-contrast text descriptions. Avoid relying on color alone to convey meaning.",
-    "adhd": "Use very short paragraphs (2–3 sentences max). Add a '## Quick Check' callout after every major concept. Use bullet points liberally.",
-    "dyslexia": "Use short sentences. Break content into small, clearly labeled chunks. Avoid long dense paragraphs.",
-    "autism-spectrum": "Be explicit and literal. Avoid idioms or ambiguous language. Clearly label sections and transitions.",
-    "cognitive-disability": "Use simple vocabulary. Define every technical term immediately. Repeat key ideas in the summary.",
+    deaf: "Avoid language that assumes hearing (e.g. 'listen to...'). Provide full text for any audio content. Prefer text and visual formats.",
+    "hard-of-hearing":
+      "Avoid language that assumes hearing. Provide text alternatives. Prefer text and visual formats.",
+    blind:
+      "Do not reference visual elements without describing them fully in text. Avoid phrases like 'see the diagram above'. Describe all concepts in words.",
+    "low-vision":
+      "Use high-contrast text descriptions. Avoid relying on color alone to convey meaning.",
+    adhd: "Use very short paragraphs (2–3 sentences max). Add a '## Quick Check' callout after every major concept. Use bullet points liberally.",
+    dyslexia:
+      "Use short sentences. Break content into small, clearly labeled chunks. Avoid long dense paragraphs.",
+    "autism-spectrum":
+      "Be explicit and literal. Avoid idioms or ambiguous language. Clearly label sections and transitions.",
+    "cognitive-disability":
+      "Use simple vocabulary. Define every technical term immediately. Repeat key ideas in the summary.",
   };
 
   const preferenceMap: Record<string, string> = {
-    "audio": "Note where content would be well-suited for listening; suggest students listen along.",
-    "visual": "Include rich descriptions of any diagrams or charts. Suggest visual analogies.",
-    "interactive": "Embed 1–2 reflection questions or exercises per section under a '## Practice' subheading.",
+    audio:
+      "Note where content would be well-suited for listening; suggest students listen along.",
+    visual:
+      "Include rich descriptions of any diagrams or charts. Suggest visual analogies.",
+    interactive:
+      "Embed 1–2 reflection questions or exercises per section under a '## Practice' subheading.",
   };
 
   for (const disability of profile.disabilities) {
@@ -72,11 +81,16 @@ function buildStudentContextInstructions(profile: StudentProfileInput): string {
   }
 
   if (profile.accessibilityNeeds.screenReaderOptimized) {
-    lines.push("Use clear heading hierarchy. Avoid ASCII art or symbol-heavy formatting.");
+    lines.push(
+      "Use clear heading hierarchy. Avoid ASCII art or symbol-heavy formatting.",
+    );
   }
 
   if (lines.length === 0) return "";
-  return "\n\nStudent Accessibility Requirements:\n" + lines.map((l) => `- ${l}`).join("\n");
+  return (
+    "\n\nStudent Accessibility Requirements:\n" +
+    lines.map((l) => `- ${l}`).join("\n")
+  );
 }
 
 // --- Concurrency helper ---
@@ -141,7 +155,9 @@ Now extract pages ${start}–${end}:`;
   const imageParts = chunk.pages.map((dataUrl) => {
     // dataUrl is like "data:image/png;base64,..."
     const [header, data] = dataUrl.split(",");
-    const mimeType = header.replace("data:", "").replace(";base64", "") as "image/png" | "image/jpeg";
+    const mimeType = header.replace("data:", "").replace(";base64", "") as
+      | "image/png"
+      | "image/jpeg";
     return { inlineData: { mimeType, data } };
   });
 
@@ -262,7 +278,10 @@ Before finalizing, verify:
         ],
       },
     ],
-    config: { systemInstruction: systemPrompt, responseMimeType: "application/json" },
+    config: {
+      systemInstruction: systemPrompt,
+      responseMimeType: "application/json",
+    },
   });
 
   return parseAIJson<CourseOutline>(response.text!);
@@ -290,11 +309,10 @@ Your writing principles:
 - Every claim must be grounded in the source material — no hallucinated facts
 - Define technical terms immediately on first use, in plain language
 - Use the "explain → example → apply" pattern for every concept: introduce it, show a concrete example, then show how it applies in the real world
-- Short paragraphs (3 sentences max) — long paragraphs are a barrier for students with ADHD and dyslexia
 - Active voice, present tense, second-person ("you") where natural
 - Bold key terms on first use; use ## subheadings to chunk content visually
 - Numbered lists for sequences or steps; bullet lists for non-ordered sets
-- For mathematical expressions, use LaTeX notation: $inline$ for inline math, $$block$$ for display equations — only when the subject genuinely requires it (math, physics, chemistry, etc.)
+- For mathematical expressions, use LaTeX notation(in new line): $inline$ for inline math, $$block$$ for display equations — only when the subject genuinely requires it (math, physics, chemistry, etc.)
 ${studentProfile ? buildStudentContextInstructions(studentProfile) : ""}
 Respond with ONLY valid JSON. No markdown fences, no preamble, no trailing text.`;
 
@@ -346,7 +364,10 @@ Before finalizing, verify:
         ],
       },
     ],
-    config: { systemInstruction: systemPrompt, responseMimeType: "application/json" },
+    config: {
+      systemInstruction: systemPrompt,
+      responseMimeType: "application/json",
+    },
   });
 
   return parseAIJson<SectionContent>(response.text!);
@@ -393,13 +414,21 @@ export async function generateCourse(
     fileSummaries.push(input.text);
   }
 
-  const outline = await generateOutlineFromSummaries(fileSummaries, input.studentProfile);
+  const outline = await generateOutlineFromSummaries(
+    fileSummaries,
+    input.studentProfile,
+  );
 
   // Generate all sections in parallel (max 5 concurrent)
   const sections = await withConcurrency(
     outline.sections.map(
       (section) => () =>
-        generateSectionWithContext(outline.title, section, fileSummaries, input.studentProfile),
+        generateSectionWithContext(
+          outline.title,
+          section,
+          fileSummaries,
+          input.studentProfile,
+        ),
     ),
     5,
   );

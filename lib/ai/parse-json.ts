@@ -19,7 +19,7 @@ export function parseAIJson<T>(raw: string): T {
     try {
       return JSON.parse(fixed) as T;
     } catch (e) {
-      console.error("Failed to parse AI JSON. Raw response (first 500 chars):", raw.slice(0, 500));
+      console.error("Failed to parse AI JSON. ", raw);
       throw e;
     }
   }
@@ -31,7 +31,17 @@ export function parseAIJson<T>(raw: string): T {
  * 2. Unescaped control characters inside strings (literal \n, \r, \t)
  */
 function fixAIJson(text: string): string {
-  const VALID_ESCAPE_CHARS = new Set(['"', "\\", "/", "b", "f", "n", "r", "t", "u"]);
+  const VALID_ESCAPE_CHARS = new Set([
+    '"',
+    "\\",
+    "/",
+    "b",
+    "f",
+    "n",
+    "r",
+    "t",
+    "u",
+  ]);
   let result = "";
   let inString = false;
   let escaped = false;

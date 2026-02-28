@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { NewCourseForm } from "@/components/courses/new-course-form";
+import Link from "next/link";
 
 export default function NewCoursePage() {
   const router = useRouter();
@@ -61,9 +62,12 @@ export default function NewCoursePage() {
   return (
     <div className="px-14 py-12">
       <p className="mb-2 text-sm text-[#9C9B99]">
-        <a href="/dashboard/courses" className="hover:text-[#1A1918] transition-colors">
+        <Link
+          href="/dashboard/courses"
+          className="hover:text-[#1A1918] transition-colors"
+        >
           ← Back to courses
-        </a>
+        </Link>
       </p>
       <h1 className="mb-10 text-[28px] font-bold text-[#1A1918]">
         Create a new course

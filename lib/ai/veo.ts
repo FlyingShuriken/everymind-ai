@@ -12,7 +12,7 @@ export async function generateSectionVideo(
 ): Promise<string> {
   const prompt = `Create a short ${MAX_DURATION_SECONDS}-second educational explainer video for a course section titled "${sectionTitle}" from the course "${courseTitle}".
 The video should visually illustrate: ${sectionSummary.slice(0, 300)}.
-Style: clear, professional educational animation. No talking head. Show concepts visually with text labels. High contrast, accessible design.`;
+Style: clear, professional educational animation. No talking head. Show concepts visually with icon or graphic labels, the video should not include any text. High contrast, accessible design.`;
 
   // Start video generation (long-running operation)
   let operation = await genai.models.generateVideos({

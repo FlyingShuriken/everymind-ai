@@ -16,5 +16,5 @@ export const genai = new GoogleGenAI({
 
 export const GEMINI_MODEL = "gemini-3-flash-preview";
 export const TTS_MODEL = "gemini-2.5-flash-tts";
-export const IMAGEN_MODEL = "imagen-4.0-fast-generate-preview-06-06";
+export const IMAGEN_MODEL = "gemini-2.5-flash-image";
 export const VEO_MODEL = "veo-3.1-fast-generate-001";
